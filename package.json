@@ -1,11 +1,11 @@
 {
   "name": "ernur-qmj",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "№130 бұйрық нысанына негізделген ҚМЖ құрастыру сайты",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check public/app.js"
+    "check": "node --check server.js && node --check public/app.js && node --check public/admin.js"
   },
   "engines": {
     "node": ">=18"

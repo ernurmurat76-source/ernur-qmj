@@ -12,8 +12,8 @@
 <body>
   <header class="header">
     <a class="brand" href="#top"><span>ET</span><strong>Ernur Тарих</strong></a>
-    <nav><a href="#builder">ҚМЖ құрастыру</a><a href="#about">Сайт туралы</a></nav>
-    <a class="header-button" href="#builder">Тегін бастау</a>
+    <nav><a href="#builder">ҚМЖ құрастыру</a><a href="#about">Сайт туралы</a><a href="/admin.html">Әкімші</a></nav>
+    <a class="header-button" href="#builder">Кодпен кіру</a>
   </header>
 
   <main id="top">
@@ -23,7 +23,7 @@
         <h1>ҚМЖ-ны дұрыс құрылыммен <em>жылдам құрастырыңыз</em></h1>
         <p>Пәнді, сыныпты, тақырып пен нақты оқу мақсатын енгізіңіз. Ernur Тарих №130 бұйрық нысанының міндетті жолдарына негізделген 45 минуттық сабақ жоспарын дайындайды.</p>
         <div class="hero-actions"><a class="primary" href="#builder">ҚМЖ құрастыру</a><a class="secondary" href="#about">Қалай жұмыс істейді?</a></div>
-        <div class="checks"><span>✓ Тіркелу қажет емес</span><span>✓ 1–11 сынып</span><span>✓ Word жүктеу</span></div>
+        <div class="checks"><span>✓ Арнайы кодпен кіру</span><span>✓ 1–11 сынып</span><span>✓ Word жүктеу</span></div>
       </div>
       <div class="hero-preview">
         <div class="preview-top"><i></i><i></i><i></i><b>Қысқа мерзімді жоспар</b></div>
@@ -36,7 +36,19 @@
 
     <section class="builder-section" id="builder">
       <div class="section-title"><span>ҚМЖ конструкторы</span><h2>Сабақ мәліметтерін енгізіңіз</h2><p>Жұлдызшамен белгіленген жолдар міндетті. Оқу мақсатын материалдан өзгеріссіз енгізіңіз.</p></div>
-      <div class="builder-layout">
+      <section class="access-card" id="accessGate">
+        <div class="access-icon">E</div>
+        <span>Ernur QMJ</span>
+        <h3>ҚМЖ құрастыру үшін кодты енгізіңіз</h3>
+        <p>Әкімші берген код мерзімі аяқталғанға дейін осы құрылғыда сақталады.</p>
+        <form id="accessForm">
+          <label>Кіру коды<input id="accessCode" autocomplete="off" spellcheck="false" placeholder="ERNUR..." required></label>
+          <button class="generate" type="submit">Кіру</button>
+        </form>
+        <p class="error" id="accessError"></p>
+      </section>
+      <div class="access-status hidden" id="accessStatus"><span>✓ Код белсенді. <b id="accessExpiry"></b></span><button id="changeCodeButton" type="button">Кодты ауыстыру</button></div>
+      <div class="builder-layout hidden" id="builderLayout">
         <form id="qmjForm" class="form-card">
           <div class="form-heading"><div><span>1-қадам</span><h3>Негізгі мәліметтер</h3></div><b>№130</b></div>
           <div class="grid two"><label>Пән *<select id="subject" required><option value="">Пәнді таңдаңыз</option></select></label><label>Сынып *<select id="grade" required><option value="">Сыныпты таңдаңыз</option></select></label></div>
@@ -56,7 +68,7 @@
           </details>
           <p class="error" id="formError"></p>
           <button class="generate" id="generateButton" type="submit"><span>✦</span> ҚМЖ құрастыру</button>
-          <p class="privacy">Енгізілген мәлімет тіркелмейді және жеке аккаунт ашылмайды.</p>
+          <p class="privacy">Жеке аккаунт ашылмайды. ҚМЖ тек жарамды кіру кодымен құрастырылады.</p>
         </form>
 
         <section class="result-card" id="resultCard">

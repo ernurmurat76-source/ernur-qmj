@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#246bfd">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Әкімші — Ernur QMJ</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="admin-page">
+  <header class="header">
+    <a class="brand" href="/"><span>E</span><strong>Ernur Тарих</strong></a>
+    <a class="header-button" href="/">Сайтқа қайту</a>
+  </header>
+  <main class="admin-main">
+    <section class="admin-card">
+      <div class="access-icon">E</div>
+      <span class="admin-label">Әкімші бөлімі</span>
+      <h1>Мұғалімге кіру кодын жасау</h1>
+      <p>Кодтың жарамдылық мерзімін 1 күннен 365 күнге дейін енгізіңіз.</p>
+      <form id="adminForm">
+        <label>Әкімші құпиясөзі *<input id="adminPassword" type="password" autocomplete="current-password" required placeholder="Render-де орнатылған құпиясөз"></label>
+        <label>Код мерзімі (күн) *<input id="durationDays" type="number" min="1" max="365" step="1" value="45" required></label>
+        <div class="quick-days" aria-label="Жылдам мерзім таңдау">
+          <button type="button" data-days="1">1 күн</button>
+          <button type="button" data-days="45">45 күн</button>
+          <button type="button" data-days="100">100 күн</button>
+          <button type="button" data-days="365">365 күн</button>
+        </div>
+        <p class="error" id="adminError"></p>
+        <button class="generate" id="createCodeButton" type="submit">Жаңа код жасау</button>
+      </form>
+      <section class="created-code hidden" id="createdCode">
+        <span>Дайын кіру коды</span>
+        <code id="codeValue"></code>
+        <p id="codeExpiry"></p>
+        <button id="copyCodeButton" type="button">Кодты көшіру</button>
+      </section>
+      <p class="admin-note">Бұл кодты тек қажетті мұғалімге жіберіңіз. Код көрсетілген күн мен уақытқа дейін жарамды.</p>
+    </section>
+  </main>
+  <div class="toast hidden" id="toast"></div>
+  <script src="/admin.js" defer></script>
+</body>
+</html>

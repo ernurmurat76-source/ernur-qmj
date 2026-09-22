@@ -15,3 +15,7 @@ services:
         sync: false
       - key: AI_MODEL
         value: openrouter/free
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ACCESS_CODE_SECRET
+        generateValue: true

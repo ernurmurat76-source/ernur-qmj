@@ -2,6 +2,8 @@
 
 const $ = selector => document.querySelector(selector);
 let current = { html: '', text: '' };
+const ACCESS_STORAGE_KEY = 'ernur-qmj-access-code';
+let accessCode = localStorage.getItem(ACCESS_STORAGE_KEY) || '';
 
 async function loadSubjects() {
   const subjects = await fetch('/subjects.json').then(response => response.json());
@@ -15,6 +17,68 @@ function toast(message) {
   $('#toast').classList.remove('hidden');
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => $('#toast').classList.add('hidden'), 2500);
+}
+
+function formatExpiry(value) {
+  return new Intl.DateTimeFormat('kk-KZ', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(value));
+}
+
+function lockBuilder(message = '') {
+  accessCode = '';
+  localStorage.removeItem(ACCESS_STORAGE_KEY);
+  $('#accessGate').classList.remove('hidden');
+  $('#accessStatus').classList.add('hidden');
+  $('#builderLayout').classList.add('hidden');
+  $('#accessError').textContent = message;
+}
+
+function unlockBuilder(code, expiresAt) {
+  accessCode = code;
+  localStorage.setItem(ACCESS_STORAGE_KEY, code);
+  $('#accessGate').classList.add('hidden');
+  $('#accessStatus').classList.remove('hidden');
+  $('#builderLayout').classList.remove('hidden');
+  $('#accessExpiry').textContent = `${formatExpiry(expiresAt)} дейін жарамды`;
+}
+
+async function verifyCode(code) {
+  const response = await fetch('/api/access/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${code}` },
+    body: '{}'
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Код тексерілмеді');
+  return data;
+}
+
+async function enterWithCode(event) {
+  event.preventDefault();
+  const code = $('#accessCode').value.trim();
+  const button = $('#accessForm button');
+  $('#accessError').textContent = '';
+  button.disabled = true;
+  button.textContent = 'Тексеріліп жатыр...';
+  try {
+    const result = await verifyCode(code);
+    unlockBuilder(code, result.expiresAt);
+    toast('Код қабылданды');
+  } catch (error) {
+    lockBuilder(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Кіру';
+  }
+}
+
+async function restoreAccess() {
+  if (!accessCode) return lockBuilder();
+  try {
+    const result = await verifyCode(accessCode);
+    unlockBuilder(accessCode, result.expiresAt);
+  } catch (error) {
+    lockBuilder(error.message);
+  }
 }
 
 function payload() {
@@ -44,7 +108,7 @@ async function generate(event) {
   button.disabled = true;
   button.textContent = 'ҚМЖ құрастырылып жатыр...';
   try {
-    const response = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) });
+    const response = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessCode}` }, body: JSON.stringify(payload()) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'ҚМЖ жасалмады');
     current = { html: data.html, text: data.text };
@@ -55,6 +119,7 @@ async function generate(event) {
     if (window.innerWidth < 900) $('#resultCard').scrollIntoView({ behavior: 'smooth' });
   } catch (error) {
     $('#formError').textContent = error.message;
+    if (/код/i.test(error.message)) lockBuilder(error.message);
     toast(error.message);
   } finally {
     button.disabled = false;
@@ -81,7 +146,10 @@ function downloadWord() {
 }
 
 $('#qmjForm').addEventListener('submit', generate);
+$('#accessForm').addEventListener('submit', enterWithCode);
+$('#changeCodeButton').addEventListener('click', () => lockBuilder());
 $('#copyButton').addEventListener('click', copyPlan);
 $('#printButton').addEventListener('click', () => window.print());
 $('#wordButton').addEventListener('click', downloadWord);
 loadSubjects().catch(() => { $('#formError').textContent = 'Пәндер тізімі жүктелмеді'; });
+restoreAccess();

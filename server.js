@@ -3,6 +3,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
@@ -11,7 +12,54 @@ const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openrouter').toLowerCase(
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const AI_MODEL = process.env.AI_MODEL || (AI_PROVIDER === 'openai' ? 'gpt-4.1-mini' : 'openrouter/free');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ACCESS_CODE_SECRET = process.env.ACCESS_CODE_SECRET || '';
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
+
+function encode(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function sign(value) {
+  return crypto.createHmac('sha256', ACCESS_CODE_SECRET).update(value).digest('base64url');
+}
+
+function safeEqual(first, second) {
+  const a = Buffer.from(String(first));
+  const b = Buffer.from(String(second));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function createAccessCode(days) {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = encode(JSON.stringify({
+    v: 1,
+    id: crypto.randomBytes(4).toString('hex').toUpperCase(),
+    iat: issuedAt,
+    exp: issuedAt + days * 86400,
+    days
+  }));
+  return `ERNUR.${payload}.${sign(payload)}`;
+}
+
+function verifyAccessCode(code) {
+  if (!ACCESS_CODE_SECRET) return { ok: false, status: 503, error: 'Код жүйесі серверде бапталмаған' };
+  const parts = String(code || '').trim().split('.');
+  if (parts.length !== 3 || parts[0] !== 'ERNUR' || !safeEqual(sign(parts[1]), parts[2])) return { ok: false, status: 401, error: 'Кіру коды қате' };
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.v !== 1 || !Number.isInteger(payload.exp) || payload.exp <= now) return { ok: false, status: 401, error: 'Кіру кодының мерзімі аяқталған' };
+    return { ok: true, payload };
+  } catch {
+    return { ok: false, status: 401, error: 'Кіру коды қате' };
+  }
+}
+
+function requestAccessCode(req, body = {}) {
+  const authorization = String(req.headers.authorization || '');
+  return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : String(body.accessCode || '').trim();
+}
 
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
@@ -140,9 +188,27 @@ async function generatePlan(body) {
 
 async function handleApi(req, res, pathname) {
   try {
-    if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key) });
+    if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET) });
+    if (req.method === 'POST' && pathname === '/api/access/verify') {
+      const body = await readJson(req);
+      const result = verifyAccessCode(requestAccessCode(req, body));
+      if (!result.ok) return sendJson(res, result.status, { error: result.error });
+      return sendJson(res, 200, { ok: true, expiresAt: new Date(result.payload.exp * 1000).toISOString(), days: result.payload.days });
+    }
+    if (req.method === 'POST' && pathname === '/api/admin/code') {
+      if (!ADMIN_PASSWORD || !ACCESS_CODE_SECRET) return sendJson(res, 503, { error: 'Render-де ADMIN_PASSWORD және ACCESS_CODE_SECRET орнатыңыз' });
+      const body = await readJson(req);
+      if (!safeEqual(body.password || '', ADMIN_PASSWORD)) return sendJson(res, 401, { error: 'Әкімші құпиясөзі қате' });
+      const days = Number(body.days);
+      if (!Number.isInteger(days) || days < 1 || days > 365) return sendJson(res, 400, { error: 'Мерзім 1–365 күн аралығында болуы керек' });
+      const code = createAccessCode(days);
+      const verified = verifyAccessCode(code);
+      return sendJson(res, 201, { code, days, expiresAt: new Date(verified.payload.exp * 1000).toISOString() });
+    }
     if (req.method === 'POST' && pathname === '/api/generate') {
       const body = await readJson(req);
+      const access = verifyAccessCode(requestAccessCode(req, body));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
       const required = ['subject', 'grade', 'language', 'section', 'topic', 'objective'];
       if (required.some(key => !String(body[key] || '').trim())) return sendJson(res, 400, { error: 'Пән, сынып, тіл, бөлім, тақырып және нақты оқу мақсатын толтырыңыз' });
       return sendJson(res, 200, await generatePlan(body));
@@ -160,7 +226,7 @@ function serveStatic(res, pathname) {
   if (!target.startsWith(PUBLIC_DIR + path.sep) && target !== path.join(PUBLIC_DIR, 'index.html')) return sendJson(res, 403, { error: 'Рұқсат жоқ' });
   fs.readFile(target, (error, data) => {
     if (error) return sendJson(res, 404, { error: 'Файл табылмады' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(target)] || 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     res.end(data);
   });
 }
