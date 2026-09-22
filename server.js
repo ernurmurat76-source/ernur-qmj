@@ -14,7 +14,10 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const AI_MODEL = process.env.AI_MODEL || (AI_PROVIDER === 'openai' ? 'gpt-4.1-mini' : 'openrouter/free');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ACCESS_CODE_SECRET = process.env.ACCESS_CODE_SECRET || '';
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
+const loginAttempts = new Map();
 
 function encode(value) {
   return Buffer.from(value).toString('base64url');
@@ -30,35 +33,96 @@ function safeEqual(first, second) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-function createAccessCode(days) {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload = encode(JSON.stringify({
-    v: 1,
-    id: crypto.randomBytes(4).toString('hex').toUpperCase(),
-    iat: issuedAt,
-    exp: issuedAt + days * 86400,
-    days
-  }));
-  return `ERNUR.${payload}.${sign(payload)}`;
+function createAccessCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.randomBytes(10);
+  const value = Array.from(bytes, byte => alphabet[byte % alphabet.length]).join('');
+  return `ERNUR-${value.slice(0, 5)}-${value.slice(5)}`;
 }
 
-function verifyAccessCode(code) {
-  if (!ACCESS_CODE_SECRET) return { ok: false, status: 503, error: 'Код жүйесі серверде бапталмаған' };
-  const parts = String(code || '').trim().split('.');
-  if (parts.length !== 3 || parts[0] !== 'ERNUR' || !safeEqual(sign(parts[1]), parts[2])) return { ok: false, status: 401, error: 'Кіру коды қате' };
+function databaseReady() {
+  return Boolean(SUPABASE_URL && SUPABASE_SECRET_KEY);
+}
+
+async function dbRequest(resource, options = {}) {
+  if (!databaseReady()) throw Object.assign(new Error('Supabase дерекқоры серверде бапталмаған'), { status: 503 });
+  const headers = {
+    apikey: SUPABASE_SECRET_KEY,
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  if (SUPABASE_SECRET_KEY.startsWith('eyJ')) headers.Authorization = `Bearer ${SUPABASE_SECRET_KEY}`;
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${resource}`, {
+    ...options,
+    headers
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) throw Object.assign(new Error(data?.message || data?.hint || 'Дерекқор қатесі'), { status: response.status });
+  return data;
+}
+
+function createAdminSession() {
+  const payload = encode(JSON.stringify({ v: 1, role: 'admin', exp: Math.floor(Date.now() / 1000) + 8 * 3600 }));
+  return `ADMIN.${payload}.${sign(payload)}`;
+}
+
+function verifyAdminSession(token) {
+  if (!ACCESS_CODE_SECRET) return false;
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'ADMIN' || !safeEqual(sign(parts[1]), parts[2])) return false;
   try {
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.v !== 1 || !Number.isInteger(payload.exp) || payload.exp <= now) return { ok: false, status: 401, error: 'Кіру кодының мерзімі аяқталған' };
-    return { ok: true, payload };
-  } catch {
-    return { ok: false, status: 401, error: 'Кіру коды қате' };
+    return payload.v === 1 && payload.role === 'admin' && payload.exp > Math.floor(Date.now() / 1000);
+  } catch { return false; }
+}
+
+async function verifyAccessCode(code, trackUsage = false) {
+  if (!databaseReady()) return { ok: false, status: 503, error: 'Код дерекқоры серверде бапталмаған' };
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!/^ERNUR-[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(normalized)) return { ok: false, status: 401, error: 'Кіру коды қате' };
+  const rows = await dbRequest(`access_codes?code=eq.${encodeURIComponent(normalized)}&select=id,code,duration_days,expires_at,is_active,usage_count&limit=1`);
+  const record = rows?.[0];
+  if (!record) return { ok: false, status: 401, error: 'Кіру коды қате' };
+  if (!record.is_active) return { ok: false, status: 401, error: 'Бұл кіру кодын әкімші тоқтатқан' };
+  if (new Date(record.expires_at).getTime() <= Date.now()) return { ok: false, status: 401, error: 'Кіру кодының мерзімі аяқталған' };
+  if (trackUsage) {
+    dbRequest(`access_codes?id=eq.${encodeURIComponent(record.id)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ last_used_at: new Date().toISOString(), usage_count: Number(record.usage_count || 0) + 1 })
+    }).catch(error => console.error('Код статистикасы жаңармады:', error.message));
   }
+  return { ok: true, record };
 }
 
 function requestAccessCode(req, body = {}) {
   const authorization = String(req.headers.authorization || '');
   return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : String(body.accessCode || '').trim();
+}
+
+function requestBearer(req) {
+  const authorization = String(req.headers.authorization || '');
+  return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+}
+
+function loginAttemptKey(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+}
+
+function loginBlocked(req) {
+  const attempt = loginAttempts.get(loginAttemptKey(req));
+  if (!attempt) return false;
+  if (attempt.blockedUntil > Date.now()) return true;
+  if (attempt.blockedUntil) loginAttempts.delete(loginAttemptKey(req));
+  return false;
+}
+
+function recordLoginFailure(req) {
+  const key = loginAttemptKey(req);
+  const attempt = loginAttempts.get(key) || { count: 0, blockedUntil: 0 };
+  attempt.count += 1;
+  if (attempt.count >= 5) attempt.blockedUntil = Date.now() + 15 * 60 * 1000;
+  loginAttempts.set(key, attempt);
 }
 
 function sendJson(res, status, body) {
@@ -188,26 +252,68 @@ async function generatePlan(body) {
 
 async function handleApi(req, res, pathname) {
   try {
-    if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET) });
+    if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET && databaseReady()) });
     if (req.method === 'POST' && pathname === '/api/access/verify') {
       const body = await readJson(req);
-      const result = verifyAccessCode(requestAccessCode(req, body));
+      const result = await verifyAccessCode(requestAccessCode(req, body));
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
-      return sendJson(res, 200, { ok: true, expiresAt: new Date(result.payload.exp * 1000).toISOString(), days: result.payload.days });
+      return sendJson(res, 200, { ok: true, expiresAt: result.record.expires_at, days: result.record.duration_days });
     }
-    if (req.method === 'POST' && pathname === '/api/admin/code') {
-      if (!ADMIN_PASSWORD || !ACCESS_CODE_SECRET) return sendJson(res, 503, { error: 'Render-де ADMIN_PASSWORD және ACCESS_CODE_SECRET орнатыңыз' });
+    if (req.method === 'POST' && pathname === '/api/admin/login') {
+      if (!ADMIN_PASSWORD || !ACCESS_CODE_SECRET || !databaseReady()) return sendJson(res, 503, { error: 'Әкімші жүйесінің Environment айнымалылары толық орнатылмаған' });
+      if (loginBlocked(req)) return sendJson(res, 429, { error: 'Кіру әрекеті тым көп. 15 минуттан кейін қайталаңыз' });
       const body = await readJson(req);
-      if (!safeEqual(body.password || '', ADMIN_PASSWORD)) return sendJson(res, 401, { error: 'Әкімші құпиясөзі қате' });
-      const days = Number(body.days);
-      if (!Number.isInteger(days) || days < 1 || days > 365) return sendJson(res, 400, { error: 'Мерзім 1–365 күн аралығында болуы керек' });
-      const code = createAccessCode(days);
-      const verified = verifyAccessCode(code);
-      return sendJson(res, 201, { code, days, expiresAt: new Date(verified.payload.exp * 1000).toISOString() });
+      if (!safeEqual(body.password || '', ADMIN_PASSWORD)) {
+        recordLoginFailure(req);
+        return sendJson(res, 401, { error: 'Әкімші құпиясөзі қате' });
+      }
+      loginAttempts.delete(loginAttemptKey(req));
+      return sendJson(res, 200, { token: createAdminSession(), expiresIn: 28800 });
+    }
+    if (pathname.startsWith('/api/admin/codes')) {
+      if (!verifyAdminSession(requestBearer(req))) return sendJson(res, 401, { error: 'Әкімші сессиясы аяқталған. Қайта кіріңіз' });
+      if (req.method === 'GET' && pathname === '/api/admin/codes') {
+        const rows = await dbRequest('access_codes?select=id,code,label,duration_days,created_at,expires_at,is_active,last_used_at,usage_count&order=created_at.desc');
+        return sendJson(res, 200, { codes: rows || [] });
+      }
+      if (req.method === 'POST' && pathname === '/api/admin/codes') {
+        const body = await readJson(req);
+        const days = Number(body.days);
+        if (!Number.isInteger(days) || days < 1 || days > 365) return sendJson(res, 400, { error: 'Мерзім 1–365 күн аралығында болуы керек' });
+        const code = createAccessCode();
+        const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+        const rows = await dbRequest('access_codes', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ code, label: String(body.label || '').trim().slice(0, 100), duration_days: days, expires_at: expiresAt })
+        });
+        return sendJson(res, 201, { code: rows[0] });
+      }
+      const match = pathname.match(/^\/api\/admin\/codes\/([0-9a-f-]+)$/i);
+      if (!match) return sendJson(res, 404, { error: 'Код табылмады' });
+      const id = encodeURIComponent(match[1]);
+      if (req.method === 'DELETE') {
+        await dbRequest(`access_codes?id=eq.${id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        return sendJson(res, 200, { ok: true });
+      }
+      if (req.method === 'PATCH') {
+        const body = await readJson(req);
+        let updates;
+        if (body.action === 'toggle') updates = { is_active: Boolean(body.isActive) };
+        else if (body.action === 'extend') {
+          const days = Number(body.days);
+          if (!Number.isInteger(days) || days < 1 || days > 365) return sendJson(res, 400, { error: 'Ұзарту мерзімі 1–365 күн болуы керек' });
+          const rows = await dbRequest(`access_codes?id=eq.${id}&select=expires_at&limit=1`);
+          if (!rows?.[0]) return sendJson(res, 404, { error: 'Код табылмады' });
+          updates = { expires_at: new Date(Math.max(Date.now(), new Date(rows[0].expires_at).getTime()) + days * 86400000).toISOString() };
+        } else return sendJson(res, 400, { error: 'Әрекет қате' });
+        const rows = await dbRequest(`access_codes?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(updates) });
+        return sendJson(res, 200, { code: rows?.[0] });
+      }
+      return sendJson(res, 405, { error: 'Әдіске рұқсат жоқ' });
     }
     if (req.method === 'POST' && pathname === '/api/generate') {
       const body = await readJson(req);
-      const access = verifyAccessCode(requestAccessCode(req, body));
+      const access = await verifyAccessCode(requestAccessCode(req, body), true);
       if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
       const required = ['subject', 'grade', 'language', 'section', 'topic', 'objective'];
       if (required.some(key => !String(body[key] || '').trim())) return sendJson(res, 400, { error: 'Пән, сынып, тіл, бөлім, тақырып және нақты оқу мақсатын толтырыңыз' });
@@ -216,7 +322,7 @@ async function handleApi(req, res, pathname) {
     return sendJson(res, 404, { error: 'API жолы табылмады' });
   } catch (error) {
     console.error(error);
-    return sendJson(res, 500, { error: error.message || 'Сервер қатесі' });
+    return sendJson(res, Number(error.status) || 500, { error: error.message || 'Сервер қатесі' });
   }
 }
 

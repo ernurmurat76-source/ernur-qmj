@@ -15,30 +15,45 @@
     <a class="header-button" href="/">Сайтқа қайту</a>
   </header>
   <main class="admin-main">
-    <section class="admin-card">
+    <section class="admin-card" id="loginPanel">
       <div class="access-icon">E</div>
       <span class="admin-label">Әкімші бөлімі</span>
-      <h1>Мұғалімге кіру кодын жасау</h1>
-      <p>Кодтың жарамдылық мерзімін 1 күннен 365 күнге дейін енгізіңіз.</p>
-      <form id="adminForm">
+      <h1>Басқару панеліне кіру</h1>
+      <p>Кодтарды көру және басқару үшін әкімші құпиясөзін енгізіңіз.</p>
+      <form id="loginForm">
         <label>Әкімші құпиясөзі *<input id="adminPassword" type="password" autocomplete="current-password" required placeholder="Render-де орнатылған құпиясөз"></label>
-        <label>Код мерзімі (күн) *<input id="durationDays" type="number" min="1" max="365" step="1" value="45" required></label>
-        <div class="quick-days" aria-label="Жылдам мерзім таңдау">
-          <button type="button" data-days="1">1 күн</button>
-          <button type="button" data-days="45">45 күн</button>
-          <button type="button" data-days="100">100 күн</button>
-          <button type="button" data-days="365">365 күн</button>
-        </div>
-        <p class="error" id="adminError"></p>
-        <button class="generate" id="createCodeButton" type="submit">Жаңа код жасау</button>
+        <p class="error" id="loginError"></p>
+        <button class="generate" id="loginButton" type="submit">Кіру</button>
       </form>
-      <section class="created-code hidden" id="createdCode">
-        <span>Дайын кіру коды</span>
-        <code id="codeValue"></code>
-        <p id="codeExpiry"></p>
-        <button id="copyCodeButton" type="button">Кодты көшіру</button>
-      </section>
-      <p class="admin-note">Бұл кодты тек қажетті мұғалімге жіберіңіз. Код көрсетілген күн мен уақытқа дейін жарамды.</p>
+    </section>
+
+    <section class="admin-dashboard hidden" id="dashboard">
+      <div class="dashboard-title"><div><span class="admin-label">Ernur QMJ</span><h1>Кодтарды басқару</h1><p>Мұғалімдердің кіру кодтарын жасаңыз және бақылаңыз.</p></div><button id="logoutButton" type="button">Шығу</button></div>
+      <div class="stats-grid">
+        <article><span>Барлық код</span><strong id="totalCount">0</strong></article>
+        <article><span>Белсенді</span><strong id="activeCount">0</strong></article>
+        <article><span>Мерзімі біткен</span><strong id="expiredCount">0</strong></article>
+        <article><span>Жалпы қолдану</span><strong id="usageCount">0</strong></article>
+      </div>
+      <div class="admin-grid">
+        <section class="panel-card create-panel">
+          <span class="admin-label">Жаңа рұқсат</span><h2>Код жасау</h2>
+          <form id="createCodeForm">
+            <label>Мұғалімнің аты немесе белгі<input id="codeLabel" maxlength="100" placeholder="Мысалы: Айгүл апай"></label>
+            <label>Мерзімі (күн) *<input id="durationDays" type="number" min="1" max="365" step="1" value="45" required></label>
+            <div class="quick-days" aria-label="Жылдам мерзім таңдау"><button type="button" data-days="1">1 күн</button><button type="button" data-days="45">45 күн</button><button type="button" data-days="100">100 күн</button><button type="button" data-days="365">365 күн</button></div>
+            <p class="error" id="createError"></p>
+            <button class="generate" id="createCodeButton" type="submit">Жаңа код жасау</button>
+          </form>
+          <section class="created-code hidden" id="createdCode"><span>Дайын код</span><code id="codeValue"></code><p id="codeExpiry"></p><button id="copyCodeButton" type="button">Кодты көшіру</button></section>
+        </section>
+        <section class="panel-card codes-panel">
+          <div class="codes-heading"><div><span class="admin-label">Бақылау</span><h2>Барлық кодтар</h2></div><button id="refreshButton" type="button">Жаңарту</button></div>
+          <div class="table-wrap"><table class="codes-table"><thead><tr><th>Мұғалім / код</th><th>Күйі</th><th>Мерзімі</th><th>Қолдану</th><th>Әрекеттер</th></tr></thead><tbody id="codesBody"></tbody></table></div>
+          <div class="codes-empty hidden" id="codesEmpty">Әзірге код жасалмаған.</div>
+          <p class="error" id="listError"></p>
+        </section>
+      </div>
     </section>
   </main>
   <div class="toast hidden" id="toast"></div>
