@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Қазақстан мұғалімдеріне арналған №130 бұйрық нысанындағы ҚМЖ құрастыру сервисі">
+  <title>Ernur Тарих — ҚМЖ құрастыру</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="header">
+    <a class="brand" href="#top"><span>ET</span><strong>Ernur Тарих</strong></a>
+    <nav><a href="#builder">ҚМЖ құрастыру</a><a href="#about">Сайт туралы</a></nav>
+    <a class="header-button" href="#builder">Тегін бастау</a>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="badge">Мұғалімге арналған қарапайым сервис</span>
+        <h1>ҚМЖ-ны дұрыс құрылыммен <em>жылдам құрастырыңыз</em></h1>
+        <p>Пәнді, сыныпты, тақырып пен нақты оқу мақсатын енгізіңіз. Ernur Тарих №130 бұйрық нысанының міндетті жолдарына негізделген 40 минуттық сабақ жоспарын дайындайды.</p>
+        <div class="hero-actions"><a class="primary" href="#builder">ҚМЖ құрастыру</a><a class="secondary" href="#about">Қалай жұмыс істейді?</a></div>
+        <div class="checks"><span>✓ Тіркелу қажет емес</span><span>✓ 1–11 сынып</span><span>✓ Word жүктеу</span></div>
+      </div>
+      <div class="hero-preview">
+        <div class="preview-top"><i></i><i></i><i></i><b>Қысқа мерзімді жоспар</b></div>
+        <div class="preview-meta"><span>Бөлім</span><strong>Функциялар</strong><span>Сабақ тақырыбы</span><strong>Сызықтық функция</strong></div>
+        <div class="preview-table"><div>Кезең/уақыт</div><div>Педагог әрекеті</div><div>Оқушы әрекеті</div><div>Бағалау</div><div>Ресурстар</div></div>
+        <div class="preview-lines"><p></p><p></p><p></p></div>
+        <div class="float-note"><b>40</b><span>минуттық жоспар</span></div>
+      </div>
+    </section>
+
+    <section class="builder-section" id="builder">
+      <div class="section-title"><span>ҚМЖ конструкторы</span><h2>Сабақ мәліметтерін енгізіңіз</h2><p>Жұлдызшамен белгіленген жолдар міндетті. Оқу мақсатын материалдан өзгеріссіз енгізіңіз.</p></div>
+      <div class="builder-layout">
+        <form id="qmjForm" class="form-card">
+          <div class="form-heading"><div><span>1-қадам</span><h3>Негізгі мәліметтер</h3></div><b>№130</b></div>
+          <div class="grid two"><label>Пән *<select id="subject" required><option value="">Пәнді таңдаңыз</option></select></label><label>Сынып *<select id="grade" required><option value="">Сыныпты таңдаңыз</option></select></label></div>
+          <div class="grid two"><label>Оқыту тілі *<select id="language" required><option>Қазақ тілі</option><option>Орыс тілі</option><option>Ағылшын тілі</option></select></label><label>Бөлім/ортақ тақырып *<input id="section" required placeholder="Бөлім атауы"></label></div>
+          <label>Сабақ тақырыбы *<input id="topic" required placeholder="Сабақтың нақты тақырыбы"></label>
+          <label>Оқу мақсатының нақты коды және тұжырымы *<textarea id="objective" required rows="3" placeholder="Мысалы: 7.4.1.5 — функцияның қасиеттерін анықтау"></textarea><small>Оқу бағдарламасынан немесе сіз беретін материалдан өзгеріссіз көшіріледі.</small></label>
+
+          <details>
+            <summary>Мектеп пен сынып туралы қосымша мәлімет</summary>
+            <div class="details-body">
+              <div class="grid two"><label>Білім беру ұйымы<input id="organization" placeholder="Мектеп атауы"></label><label>Педагогтің аты-жөні<input id="teacher" placeholder="Аты-жөні"></label></div>
+              <div class="grid three"><label>Күні<input id="lessonDate" type="date"></label><label>Қатысушылар<input id="present" type="number" min="0"></label><label>Қатыспағандар<input id="absent" type="number" min="0"></label></div>
+              <label>Сыныптың ерекшелігі<textarea id="classProfile" rows="2" placeholder="Дайындық деңгейі, тілдік кедергі, қолдау қажеттілігі"></textarea></label>
+              <label>Қолжетімді ресурстар және қауіпсіздік<input id="availableResources" placeholder="Оқулық, интерактивті тақта, спорт құралдары және т.б."></label>
+              <label>Қосымша талап<input id="extra" placeholder="Мысалы: топтық тапсырма қосу"></label>
+            </div>
+          </details>
+          <p class="error" id="formError"></p>
+          <button class="generate" id="generateButton" type="submit"><span>✦</span> ҚМЖ құрастыру</button>
+          <p class="privacy">Енгізілген мәлімет тіркелмейді және жеке аккаунт ашылмайды.</p>
+        </form>
+
+        <section class="result-card" id="resultCard">
+          <div class="empty-result" id="emptyResult"><div>ET</div><h3>Дайын ҚМЖ осы жерде шығады</h3><p>Форманы толтырып, «ҚМЖ құрастыру» батырмасын басыңыз.</p><ul><li>№130 нысанындағы 5 баған</li><li>40 минуттық сабақ кезеңдері</li><li>Дескрипторлар мен баллдар</li></ul></div>
+          <div class="result-content hidden" id="resultContent">
+            <div class="result-tools"><div><i></i><strong>ҚМЖ дайын</strong><small id="modelLabel"></small></div><div><button id="copyButton" type="button">Көшіру</button><button id="printButton" type="button">Басып шығару</button><button class="download" id="wordButton" type="button">Word жүктеу</button></div></div>
+            <div id="result"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="about" id="about">
+      <div><span>Қарапайым жұмыс тәртібі</span><h2>Үш қадамда дайын ҚМЖ</h2></div>
+      <div class="steps"><article><b>1</b><h3>Мәліметті таңдаңыз</h3><p>Пән, сынып, бөлім және тақырыпты енгізіңіз.</p></article><article><b>2</b><h3>Мақсатты көрсетіңіз</h3><p>Нақты код пен тұжырымды материалдан таңдаңыз.</p></article><article><b>3</b><h3>ҚМЖ-ны жүктеңіз</h3><p>Нәтижені тексеріп, Word файлын алыңыз.</p></article></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand"><span>ET</span><strong>Ernur Тарих</strong></div>
+    <p>Мұғалімге арналған ҚМЖ құрастыру сервисі</p>
+    <div class="author"><small>Автор: <strong>Мұрат Ернұр Мырзағалиұлы</strong></small><div class="contact-links"><a href="https://wa.me/77055630880" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp арқылы байланысу">WhatsApp: 8 705 563 08 80</a><a class="telegram" href="https://t.me/+77055630880" target="_blank" rel="noopener noreferrer" aria-label="Telegram арқылы байланысу">Telegram: 8 705 563 08 80</a></div></div>
+  </footer>
+  <div class="toast hidden" id="toast"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
