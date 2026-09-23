@@ -2,6 +2,7 @@
 
 const $ = selector => document.querySelector(selector);
 let current = { html: '', text: '' };
+let referenceLessons = [];
 const ACCESS_STORAGE_KEY = 'ernur-qmj-access-code';
 let accessCode = localStorage.getItem(ACCESS_STORAGE_KEY) || '';
 
@@ -39,6 +40,48 @@ function unlockBuilder(code, expiresAt) {
   $('#accessStatus').classList.remove('hidden');
   $('#builderLayout').classList.remove('hidden');
   $('#accessExpiry').textContent = `${formatExpiry(expiresAt)} дейін жарамды`;
+  loadReferences();
+}
+
+function referenceLabel(item) {
+  const number = item.lessonNumbers?.length ? `${item.lessonNumbers.join('–')}-сабақ · ` : '';
+  return `${number}${item.topic}`;
+}
+
+async function loadReferences() {
+  const select = $('#referenceLesson');
+  const grade = $('#grade').value;
+  const subject = $('#subject').value;
+  referenceLessons = [];
+  select.replaceChildren(new Option('Алдымен пән мен сыныпты таңдаңыз', ''));
+  select.disabled = true;
+  if (!accessCode || !grade || !subject) return;
+  select.replaceChildren(new Option('ҚМЖ базасы жүктеліп жатыр...', ''));
+  try {
+    const url = `/api/references?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(subject)}`;
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessCode}` } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'ҚМЖ базасы жүктелмеді');
+    referenceLessons = data.references || [];
+    select.replaceChildren(new Option(referenceLessons.length ? 'Дайын сабақты таңдаңыз' : 'Бұл пән мен сыныпқа дайын база жоқ', ''));
+    for (const item of referenceLessons) select.add(new Option(referenceLabel(item), item.id));
+    select.disabled = !referenceLessons.length;
+    $('#referenceHint').textContent = referenceLessons.length
+      ? `Базадан ${referenceLessons.length} сабақ табылды. Сабақты таңдағанда мәліметтер автоматты толтырылады.`
+      : 'Бұл пән мен сынып бойынша дайын үлгі жоқ. Мәліметтерді қолмен толтырып, ЖИ арқылы ҚМЖ жасай аласыз.';
+  } catch (error) {
+    select.replaceChildren(new Option('ҚМЖ базасы уақытша жүктелмеді', ''));
+    $('#referenceHint').textContent = error.message;
+  }
+}
+
+function applyReference() {
+  const item = referenceLessons.find(reference => reference.id === $('#referenceLesson').value);
+  if (!item) return;
+  $('#section').value = item.section || '';
+  $('#topic').value = item.topic || '';
+  $('#objective').value = item.objectives || '';
+  toast('Сабақ мәліметтері базадан толтырылды');
 }
 
 async function verifyCode(code) {
@@ -96,7 +139,8 @@ function payload() {
     absent: $('#absent').value,
     classProfile: $('#classProfile').value.trim(),
     availableResources: $('#availableResources').value.trim(),
-    extra: $('#extra').value.trim()
+    extra: $('#extra').value.trim(),
+    referenceId: $('#referenceLesson').value
   };
 }
 
@@ -113,7 +157,7 @@ async function generate(event) {
     if (!response.ok) throw new Error(data.error || 'ҚМЖ жасалмады');
     current = { html: data.html, text: data.text };
     $('#result').innerHTML = data.html;
-    $('#modelLabel').textContent = data.model === 'demo-template' ? 'Демо құрылым' : 'ЖИ арқылы';
+    $('#modelLabel').textContent = data.reference ? `ЖИ · ҚМЖ базасы: ${data.reference.topic}` : (data.model === 'demo-template' ? 'Демо құрылым' : 'ЖИ арқылы');
     $('#emptyResult').classList.add('hidden');
     $('#resultContent').classList.remove('hidden');
     if (window.innerWidth < 900) $('#resultCard').scrollIntoView({ behavior: 'smooth' });
@@ -151,5 +195,8 @@ $('#changeCodeButton').addEventListener('click', () => lockBuilder());
 $('#copyButton').addEventListener('click', copyPlan);
 $('#printButton').addEventListener('click', () => window.print());
 $('#wordButton').addEventListener('click', downloadWord);
+$('#subject').addEventListener('change', loadReferences);
+$('#grade').addEventListener('change', loadReferences);
+$('#referenceLesson').addEventListener('change', applyReference);
 loadSubjects().catch(() => { $('#formError').textContent = 'Пәндер тізімі жүктелмеді'; });
 restoreAccess();

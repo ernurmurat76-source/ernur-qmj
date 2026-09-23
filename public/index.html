@@ -8,6 +8,7 @@
   <title>Ernur Тарих — ҚМЖ құрастыру</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <style>.reference-field{padding:13px;border:1px solid #cddcff;border-radius:12px;background:#f5f8ff}.reference-field select{background:#fff}.reference-field select:disabled{color:#7a8497;background:#f3f5f8}</style>
 </head>
 <body>
   <header class="header">
@@ -57,6 +58,10 @@
         <form id="qmjForm" class="form-card">
           <div class="form-heading"><div><span>1-қадам</span><h3>Негізгі мәліметтер</h3></div><b>№130</b></div>
           <div class="grid two"><label>Пән *<select id="subject" required><option value="">Пәнді таңдаңыз</option></select></label><label>Сынып *<select id="grade" required><option value="">Сыныпты таңдаңыз</option></select></label></div>
+          <label class="reference-field">Дайын ҚМЖ базасынан сабақ таңдау
+            <select id="referenceLesson" disabled><option value="">Алдымен пән мен сыныпты таңдаңыз</option></select>
+            <small id="referenceHint">Базада 5–11 сынып математикасы, алгебра және геометрияның 1-тоқсан сабақтары бар. Таңдасаңыз, бөлім, тақырып және оқу мақсаты автоматты толтырылады.</small>
+          </label>
           <div class="grid two"><label>Оқыту тілі *<select id="language" required><option>Қазақ тілі</option><option>Орыс тілі</option><option>Ағылшын тілі</option></select></label><label>Бөлім/ортақ тақырып *<input id="section" required placeholder="Бөлім атауы"></label></div>
           <label>Сабақ тақырыбы *<input id="topic" required placeholder="Сабақтың нақты тақырыбы"></label>
           <label>Оқу мақсатының нақты коды және тұжырымы *<textarea id="objective" required rows="3" placeholder="Мысалы: 7.4.1.5 — функцияның қасиеттерін анықтау"></textarea><small>Оқу бағдарламасынан немесе сіз беретін материалдан өзгеріссіз көшіріледі.</small></label>

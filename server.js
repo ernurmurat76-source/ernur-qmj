@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const REFERENCE_PATH = path.join(__dirname, 'data', 'qmj-reference-index.json');
 const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openrouter').toLowerCase();
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
@@ -18,6 +19,13 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
 const loginAttempts = new Map();
+let referenceDatabase = { records: [] };
+try {
+  referenceDatabase = JSON.parse(fs.readFileSync(REFERENCE_PATH, 'utf8'));
+  if (!Array.isArray(referenceDatabase.records)) referenceDatabase.records = [];
+} catch (error) {
+  console.error('ҚМЖ анықтамалық базасы жүктелмеді:', error.message);
+}
 
 function encode(value) {
   return Buffer.from(value).toString('base64url');
@@ -154,6 +162,108 @@ function asList(value, fallback) {
   return list.length ? list : fallback;
 }
 
+function splitText(value, fallback = []) {
+  const list = String(value || '')
+    .split(/\n+|(?<=[.!?])\s+(?=[А-ЯӘІҢҒҮҰҚӨҺA-Z])/u)
+    .map(item => item.replace(/^[•\-–—\d.)\s]+/, '').trim())
+    .filter(item => item.length > 2)
+    .slice(0, 8);
+  return list.length ? list : fallback;
+}
+
+function normalizedWords(value) {
+  return new Set(String(value || '').toLocaleLowerCase('kk-KZ').match(/[а-яәіңғүұқөһa-z0-9]{3,}/giu) || []);
+}
+
+function referenceSummaries(grade, subject) {
+  const gradeNumber = Number(String(grade || '').match(/\d+/)?.[0]);
+  return referenceDatabase.records
+    .filter(item => item.grade === gradeNumber && item.subject === subject)
+    .map(item => ({
+      id: item.id,
+      lessonNumbers: item.lesson_numbers,
+      section: item.section,
+      topic: item.topic || `Сабақ ${item.lesson_numbers?.join('–') || ''}`,
+      objectives: item.objectives,
+      qualityFlags: item.quality_flags
+    }));
+}
+
+function selectReference(body) {
+  const gradeNumber = Number(String(body.grade || '').match(/\d+/)?.[0]);
+  const candidates = referenceDatabase.records.filter(item => item.grade === gradeNumber && item.subject === body.subject);
+  if (!candidates.length) return null;
+  const exact = candidates.find(item => item.id === body.referenceId);
+  if (exact) return exact;
+  const topicWords = normalizedWords(body.topic);
+  const objectiveCodes = String(body.objective || '').match(/\b\d{1,2}(?:\.\d+){2,}\b/g) || [];
+  let best = null;
+  let bestScore = 0;
+  for (const item of candidates) {
+    let score = 0;
+    if (objectiveCodes.some(code => item.objective_codes?.includes(code))) score += 12;
+    const words = normalizedWords(`${item.topic} ${item.section}`);
+    for (const word of topicWords) if (words.has(word)) score += 1;
+    if (String(item.section || '').toLocaleLowerCase('kk-KZ') === String(body.section || '').toLocaleLowerCase('kk-KZ')) score += 3;
+    if (score > bestScore) { best = item; bestScore = score; }
+  }
+  return bestScore >= 3 ? best : null;
+}
+
+function distributeMinutes(stages) {
+  if (!stages.length) return [];
+  const defaults = stages.length === 3 ? [8, 30, 7] : Array(stages.length).fill(Math.floor(45 / stages.length));
+  const source = stages.map((stage, index) => Number(stage.minutes) > 0 ? Number(stage.minutes) : defaults[index] || 5);
+  const total = source.reduce((sum, value) => sum + value, 0) || 45;
+  const result = source.map(value => Math.max(1, Math.round(value * 45 / total)));
+  result[result.length - 1] += 45 - result.reduce((sum, value) => sum + value, 0);
+  return result;
+}
+
+function planFromReference(reference, body) {
+  if (!reference) return demoPlan(body);
+  let usable = reference.stages.filter(stage => stage.teacher || stage.learner).slice(0, 6);
+  if (!usable.length) return demoPlan(body);
+  const minutes = distributeMinutes(usable);
+  const stages = usable.map((stage, index) => {
+    const beginning = /басы|ұйымдастыру|кіріспе/i.test(stage.stage || '');
+    const ending = /соңы|қорытынды|рефлек/i.test(stage.stage || '');
+    return {
+      name: stage.stage?.replace(/\s*\d{1,2}\s*(минут|мин).*$/i, '').trim() || `Сабақ кезеңі ${index + 1}`,
+      minutes: minutes[index],
+      method: ending ? 'Қысқа рефлексия' : beginning ? 'Ой қозғау' : 'Түсіндір және орында',
+      workForm: beginning ? 'Бүкіл сыныппен жұмыс' : ending ? 'Жеке жұмыс' : 'Жеке және жұптық жұмыс',
+      teacherActions: splitText(stage.teacher, ['Тапсырманы түсіндіреді және орындалуын бақылайды.']),
+      learnerActions: splitText(stage.learner, ['Берілген тапсырманы орындайды және нәтижесін түсіндіреді.']),
+      descriptors: [{ text: ending ? 'өз нәтижесіне қысқа қорытынды жасайды' : 'тапсырманы берілген шартқа сай орындайды', points: 1 }],
+      feedback: splitText(stage.assessment, ['Дескрипторға сай ауызша кері байланыс']).join(' '),
+      resources: splitText(stage.resources, ['Оқулық', 'Тапсырма парағы']).slice(0, 5),
+      support: 'Қажет оқушыға үлгі, тірек сөз немесе кезеңдік нұсқаулық беріледі.'
+    };
+  });
+  return {
+    lessonObjectives: splitText(reference.lesson_objectives, [`${body.topic} тақырыбы бойынша оқу мақсатына жету`]),
+    assessmentCriteria: ['оқу мақсатына сәйкес тапсырманы орындайды', 'шешімін немесе жауабын негіздеп түсіндіреді'],
+    stages,
+    differentiation: 'Қолдауды қажет ететін оқушыға үлгі мен кезеңдік нұсқаулық беріледі; дайын оқушыға дәлелдеуді қажет ететін күрделендірілген тапсырма ұсынылады.',
+    safety: 'Сыныптағы қауіпсіздік және цифрлық құралдарды дұрыс пайдалану талаптары сақталады.'
+  };
+}
+
+function referenceContext(reference) {
+  if (!reference) return 'Сәйкес мұғалімдік үлгі табылмады.';
+  const stages = reference.stages.map(stage => ({
+    stage: stage.stage, minutes: stage.minutes, teacher: stage.teacher,
+    learner: stage.learner, assessment: stage.assessment, resources: stage.resources
+  }));
+  return JSON.stringify({
+    sourceStatus: 'Мұғалім берген әдістемелік үлгі; нормативтік дерек емес',
+    section: reference.section, topic: reference.topic, objectives: reference.objectives,
+    lessonObjectives: reference.lesson_objectives, values: reference.values,
+    stages, knownIssues: reference.quality_flags
+  }, null, 2).slice(0, 24000);
+}
+
 function demoPlan(body) {
   const pe = body.subject === 'Дене шынықтыру';
   return {
@@ -184,8 +294,8 @@ function demoPlan(body) {
   };
 }
 
-function normalizePlan(raw, body) {
-  const fallback = demoPlan(body);
+function normalizePlan(raw, body, reference = null) {
+  const fallback = planFromReference(reference, body);
   const rawStages = Array.isArray(raw?.stages) && raw.stages.length ? raw.stages.slice(0, 6) : fallback.stages;
   const stages = rawStages.map((stage, index) => ({
     name: String(stage?.name || fallback.stages[index]?.name || `Сабақ кезеңі ${index + 1}`).trim(),
@@ -212,7 +322,7 @@ function normalizePlan(raw, body) {
   };
 }
 
-function renderPlan(body, plan, model) {
+function renderPlan(body, plan, model, reference = null) {
   const list = items => `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
   const rows = plan.stages.map(stage => {
     const points = stage.descriptors.reduce((sum, item) => sum + item.points, 0);
@@ -220,9 +330,10 @@ function renderPlan(body, plan, model) {
     const assessment = `<strong>Дескрипторлар — ${points} балл:</strong>${list(stage.descriptors.map(item => `${item.text} — ${item.points}`))}<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
     return `<tr><td><strong>${escapeHtml(stage.name)}</strong><br>${stage.minutes} минут</td><td>${teacher}</td><td>${list(stage.learnerActions)}</td><td>${assessment}</td><td>${list(stage.resources)}</td></tr>`;
   }).join('');
-  const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысушылар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr><tr><th>Бағалау критерийлері <small>(әдістемелік толықтыру)</small></th><td>${list(plan.assessmentCriteria)}</td></tr></table><h3>Сабақтың барысы — 45 минут</h3><table class="flow-table"><thead><tr><th>Сабақтың кезеңі/уақыт</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table><section class="method-notes"><h3>Әдістемелік толықтырулар</h3><p><strong>Саралау және қолдау:</strong> ${escapeHtml(plan.differentiation)}</p><p><strong>Қауіпсіздік:</strong> ${escapeHtml(plan.safety)}</p><p><em>Бағалау критерийлері, дескрипторлар, баллдар, саралау және қауіпсіздік түсіндірмелері — ҚМЖ сапасын күшейтетін әдістемелік толықтырулар.</em></p></section></article>`;
+  const valuesRow = reference?.values ? `<tr><th>Құндылықтар</th><td>${escapeHtml(reference.values)}</td></tr>` : '';
+  const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысушылар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr><tr><th>Бағалау критерийлері <small>(әдістемелік толықтыру)</small></th><td>${list(plan.assessmentCriteria)}</td></tr>${valuesRow}</table><h3>Сабақтың барысы — 45 минут</h3><table class="flow-table"><thead><tr><th>Сабақтың кезеңі/уақыт</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table><section class="method-notes"><h3>Әдістемелік толықтырулар</h3><p><strong>Саралау және қолдау:</strong> ${escapeHtml(plan.differentiation)}</p><p><strong>Қауіпсіздік:</strong> ${escapeHtml(plan.safety)}</p><p><em>Бағалау критерийлері, дескрипторлар, баллдар, саралау және қауіпсіздік түсіндірмелері — ҚМЖ сапасын күшейтетін әдістемелік толықтырулар.</em></p></section></article>`;
   const text = `Қысқа мерзімді (сабақ) жоспары\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nОқу мақсаты: ${body.objective}`;
-  return { html, text, model, format: 'qmj-130' };
+  return { html, text, model, format: 'qmj-130', reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
 }
 
 function apiConfig() {
@@ -231,28 +342,38 @@ function apiConfig() {
 }
 
 async function generatePlan(body) {
+  const reference = selectReference(body);
   const config = apiConfig();
-  if (!config.key) return renderPlan(body, demoPlan(body), 'demo-template');
-  const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. Берілген нақты оқу мақсатын өзгертпей, бір 45 минуттық ҚМЖ мазмұнын құрастыр. Пәнге, сынып жасына және тақырыпқа сай болсын. Әр оқу тапсырмасы үшін бақыланатын дескриптор мен оң бүтін балл бер. Педагог әрекетінде нақты практикалық тәсіл мен жұмыс формасын көрсет, бірақ теориялық модельдер мен автор атауларын қоспа. Дене шынықтыруда жүктеме, арақашықтық, құрал және қауіпсіздікті нақтыла. Тек JSON қайтар: {"lessonObjectives":["..."],"assessmentCriteria":["..."],"stages":[{"name":"...","minutes":8,"method":"...","workForm":"...","teacherActions":["..."],"learnerActions":["..."],"descriptors":[{"text":"...","points":1}],"feedback":"...","resources":["..."],"support":"..."}],"differentiation":"...","safety":"..."}. Кезең минуттарының қосындысы дәл 45 болсын.`;
-  const user = `Оқыту тілі: ${body.language}\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nОқу мақсаты: ${body.objective}\nСынып ерекшелігі: ${body.classProfile || 'көрсетілмеген'}\nҚолжетімді ресурстар: ${body.availableResources || 'көрсетілмеген'}\nҚосымша талап: ${body.extra || 'жоқ'}`;
+  if (!config.key) return renderPlan(body, planFromReference(reference, body), reference ? 'ҚМЖ базасы' : 'demo-template', reference);
+  const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. Бір сабаққа арналған, мазмұны өзара үйлесімді 45 минуттық ҚМЖ құрастыр. Пайдаланушы берген оқу мақсатының коды мен тұжырымын ешқашан өзгертпе және ойдан жаңа оқу мақсатын қоспа. Тапсырмалар пәнге, сынып жасына, тақырыпқа және оқу мақсатына нақты сәйкес болсын; жалпылама немесе мағынасыз мәтін жазба. Әр тапсырма үшін өлшенетін дескриптор және кемінде 1 оң бүтін балл көрсет. Педагог әрекетінде нақты әдіс пен жұмыс формасын жаз. Кезең минуттарының қосындысы дәл 45 болсын. Қосылған мұғалімдік ҚМЖ үлгісін құрылым мен идея көзі ретінде пайдалан, бірақ ол нормативтік құжат емес: ішіндегі қате, 40 минуттық бөлу немесе тақырыпқа сәйкес емес тапсырманы қайталама. Дене шынықтыруда жүктеме, арақашықтық, құрал және қауіпсіздікті нақтыла. Тек JSON қайтар: {"lessonObjectives":["..."],"assessmentCriteria":["..."],"stages":[{"name":"...","minutes":8,"method":"...","workForm":"...","teacherActions":["..."],"learnerActions":["..."],"descriptors":[{"text":"...","points":1}],"feedback":"...","resources":["..."],"support":"..."}],"differentiation":"...","safety":"..."}.`;
+  const user = `Оқыту тілі: ${body.language}\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nӨЗГЕРТІЛМЕЙТІН оқу мақсаты: ${body.objective}\nСынып ерекшелігі: ${body.classProfile || 'көрсетілмеген'}\nҚолжетімді ресурстар: ${body.availableResources || 'көрсетілмеген'}\nҚосымша талап: ${body.extra || 'жоқ'}\n\nМҰҒАЛІМ БЕРГЕН АНЫҚТАМАЛЫҚ ҮЛГІ:\n${referenceContext(reference)}`;
   const headers = { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' };
   if (AI_PROVIDER !== 'openai') Object.assign(headers, { 'HTTP-Referer': process.env.PUBLIC_URL || `http://localhost:${PORT}`, 'X-Title': 'ernur-qmj' });
-  const response = await fetch(config.url, { method: 'POST', headers, body: JSON.stringify({ model: AI_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.25, max_tokens: 4500 }) });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result?.error?.message || 'ЖИ сервисі жауап бермеді');
-  const content = result?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('ЖИ бос жауап қайтарды');
   try {
+    const response = await fetch(config.url, { method: 'POST', headers, body: JSON.stringify({ model: AI_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.25, max_tokens: 4500 }) });
+    const result = await response.json();
+    if (!response.ok) return renderPlan(body, planFromReference(reference, body), 'ЖИ қолжетімсіз · ҚМЖ базасы', reference);
+    const content = result?.choices?.[0]?.message?.content;
+    if (!content) return renderPlan(body, planFromReference(reference, body), 'ЖИ бос жауап берді · ҚМЖ базасы', reference);
     const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-    return renderPlan(body, normalizePlan(JSON.parse(cleaned), body), result.model || AI_MODEL);
-  } catch {
-    return renderPlan(body, demoPlan(body), `${result.model || AI_MODEL} · құрылымдық резерв`);
+    return renderPlan(body, normalizePlan(JSON.parse(cleaned), body, reference), result.model || AI_MODEL, reference);
+  } catch (error) {
+    console.error('ЖИ резервтік режимге ауысты:', error.message);
+    return renderPlan(body, planFromReference(reference, body), 'ҚМЖ базасы · резервтік режим', reference);
   }
 }
 
 async function handleApi(req, res, pathname) {
   try {
-    if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET && databaseReady()) });
+    if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET && databaseReady()), referenceCount: referenceDatabase.records.length });
+    if (req.method === 'GET' && pathname === '/api/references') {
+      const access = await verifyAccessCode(requestAccessCode(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
+      const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const grade = url.searchParams.get('grade') || '';
+      const subject = url.searchParams.get('subject') || '';
+      return sendJson(res, 200, { scope: referenceDatabase.source_scope, references: referenceSummaries(grade, subject) });
+    }
     if (req.method === 'POST' && pathname === '/api/access/verify') {
       const body = await readJson(req);
       const result = await verifyAccessCode(requestAccessCode(req, body));

@@ -71,6 +71,15 @@ async function main() {
     assert.match(created.data.code.code, /^ERNUR-[A-Z2-9]{5}-[A-Z2-9]{5}$/);
     const teacherAuth = { 'Content-Type': 'application/json', Authorization: `Bearer ${created.data.code.code}` };
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: teacherAuth, body: '{}' })).status, 200);
+    const references = await request('/api/references?grade=5-%D1%81%D1%8B%D0%BD%D1%8B%D0%BF&subject=%D0%9C%D0%B0%D1%82%D0%B5%D0%BC%D0%B0%D1%82%D0%B8%D0%BA%D0%B0', { headers: teacherAuth });
+    assert.equal(references.status, 200);
+    assert.equal(references.data.references.length, 39);
+    assert.ok(references.data.references[0].topic);
+    const selected = references.data.references[0];
+    const generatedFromBase = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', language: 'Қазақ тілі', section: selected.section, topic: selected.topic, objective: selected.objectives, referenceId: selected.id }) });
+    assert.equal(generatedFromBase.status, 200);
+    assert.equal(generatedFromBase.data.reference.id, selected.id);
+    assert.ok(generatedFromBase.data.html.includes('45 минут'));
     const generated = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(generated.status, 200);
     assert.ok(generated.data.html.includes('45 минут'));
@@ -83,7 +92,7 @@ async function main() {
     assert.equal(list.data.codes.length, 1);
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'DELETE', headers: auth })).status, 200);
     assert.equal((await request('/api/admin/codes', { headers: auth })).data.codes.length, 0);
-    console.log('Admin CRUD, access control and 45-minute QMJ: OK');
+    console.log('Admin CRUD, access control, 275-reference database and 45-minute QMJ: OK');
   } finally {
     app.kill();
     database.close();

@@ -1,0 +1,78 @@
+{
+  "records": 275,
+  "failures": [
+    {
+      "file": "Атамура 1 токсан Меруерт/11кл геом атамура меру/11кл геом 15-16саб.docx",
+      "error": "File is not a zip file"
+    }
+  ],
+  "quality_flags": {
+    "duration_not_45": 73,
+    "missing_lesson_objectives": 46,
+    "missing_topic": 5,
+    "missing_objectives": 3,
+    "objective_without_code": 8
+  },
+  "coverage": {
+    "10-сынып Алгебра": {
+      "records": 28,
+      "with_topic": 28,
+      "with_objective_code": 27
+    },
+    "10-сынып Геометрия": {
+      "records": 14,
+      "with_topic": 14,
+      "with_objective_code": 12
+    },
+    "11-сынып Алгебра": {
+      "records": 29,
+      "with_topic": 29,
+      "with_objective_code": 28
+    },
+    "11-сынып Геометрия": {
+      "records": 14,
+      "with_topic": 14,
+      "with_objective_code": 12
+    },
+    "5-сынып Математика": {
+      "records": 39,
+      "with_topic": 39,
+      "with_objective_code": 39
+    },
+    "6-сынып Математика": {
+      "records": 39,
+      "with_topic": 38,
+      "with_objective_code": 38
+    },
+    "7-сынып Алгебра": {
+      "records": 22,
+      "with_topic": 21,
+      "with_objective_code": 22
+    },
+    "7-сынып Геометрия": {
+      "records": 15,
+      "with_topic": 14,
+      "with_objective_code": 14
+    },
+    "8-сынып Алгебра": {
+      "records": 22,
+      "with_topic": 20,
+      "with_objective_code": 20
+    },
+    "8-сынып Геометрия": {
+      "records": 16,
+      "with_topic": 16,
+      "with_objective_code": 15
+    },
+    "9-сынып Алгебра": {
+      "records": 23,
+      "with_topic": 23,
+      "with_objective_code": 23
+    },
+    "9-сынып Геометрия": {
+      "records": 14,
+      "with_topic": 14,
+      "with_objective_code": 14
+    }
+  }
+}
