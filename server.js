@@ -212,10 +212,10 @@ function normalizedWords(value) {
   return new Set(String(value || '').toLocaleLowerCase('kk-KZ').match(/[а-яәіңғүұқөһa-z0-9]{3,}/giu) || []);
 }
 
-function referenceSummaries(grade, subject) {
+function referenceSummaries(grade, subject, term = 0) {
   const gradeNumber = Number(String(grade || '').match(/\d+/)?.[0]);
   return referenceDatabase.records
-    .filter(item => item.grade === gradeNumber && item.subject === subject)
+    .filter(item => item.grade === gradeNumber && item.subject === subject && (!term || item.term === term))
     .map(item => ({
       id: item.id,
       lessonNumbers: item.lesson_numbers,
@@ -228,7 +228,8 @@ function referenceSummaries(grade, subject) {
 
 function selectReference(body) {
   const gradeNumber = Number(String(body.grade || '').match(/\d+/)?.[0]);
-  const candidates = referenceDatabase.records.filter(item => item.grade === gradeNumber && item.subject === body.subject);
+  const term = Number(body.term || 0);
+  const candidates = referenceDatabase.records.filter(item => item.grade === gradeNumber && item.subject === body.subject && (!term || item.term === term));
   if (!candidates.length) return null;
   const exact = candidates.find(item => item.id === body.referenceId);
   if (exact) return exact;
@@ -260,7 +261,7 @@ function distributeMinutes(stages) {
 function planFromReference(reference, body) {
   if (!reference) return demoPlan(body);
   let usable = reference.stages.filter(stage => stage.teacher || stage.learner).slice(0, 6);
-  if (!usable.length) return demoPlan(body);
+  if (!usable.length) return curriculumPlan(body, reference);
   const minutes = distributeMinutes(usable);
   const stages = usable.map((stage, index) => {
     const beginning = /басы|ұйымдастыру|кіріспе/i.test(stage.stage || '');
@@ -287,6 +288,40 @@ function planFromReference(reference, body) {
   };
 }
 
+function curriculumPlan(body, reference) {
+  const geometry = body.subject === 'Геометрия';
+  const objective = body.objective || reference?.objectives || '';
+  return {
+    lessonObjectives: [`${body.topic} тақырыбында берілген оқу мақсатына сәйкес математикалық әрекетті орындау`, 'Шешу жолын математикалық тілде түсіндіріп, нәтижесін тексеру'],
+    assessmentCriteria: ['оқу мақсатына сәйкес есептеу, түрлендіру, модельдеу немесе дәлелдеу әрекетін орындайды', 'шешу қадамдарын негіздеп, нәтижесінің дұрыстығын тексереді'],
+    stages: [
+      {
+        name: 'Сабақтың басы', minutes: 8, method: 'Алдыңғы білімді өзектендіру', workForm: 'Бүкіл сыныппен жұмыс',
+        teacherActions: [`${body.topic} тақырыбына қажетті алдыңғы білімді анықтайтын қысқа сұрақ немесе есеп ұсынады.`, `Оқу мақсатын өзгеріссіз таныстырады: ${objective}`],
+        learnerActions: ['Алдыңғы білімге сүйеніп қысқа жауап береді.', 'Оқу мақсаты бойынша күтілетін математикалық әрекетті анықтайды.'],
+        descriptors: [{ text: 'тақырыпқа қажетті ұғымды немесе қасиетті дұрыс атайды', points: 1 }],
+        feedback: 'Жауаптың дәлдігіне қарай нақтылаушы сұрақ және қысқа түзету беріледі.', resources: ['Тақта', 'Тірек сұрақ'], support: 'Негізгі ұғымдар мен белгілеулер ұсынылады.'
+      },
+      {
+        name: 'Сабақтың ортасы', minutes: 30, method: geometry ? 'Сызба–дәлел–қорытынды' : 'Үлгі–алгоритм–қолдану', workForm: 'Жеке және жұптық жұмыс',
+        teacherActions: [geometry ? 'Тақырыпқа сай сызбаны немесе модельді талдатып, қасиетті қолдану жолын көрсетеді.' : 'Тақырыпқа сай бір үлгінің негізгі қадамдарын түсіндіріп, алгоритмді оқушымен бірге тұжырымдайды.', 'Оқу мақсатына тікелей сәйкес жеке тапсырма береді, кейін жұпта шешу тәсілдерін салыстыруды ұйымдастырады.', 'Қате қадамды анықтауға және нәтижені басқа тәсілмен тексеруге жетелейтін сұрақтар қояды.'],
+        learnerActions: [geometry ? 'Сызбадағы берілгендер мен ізделінді шаманы белгілеп, қасиетті қолданады.' : 'Алгоритмді қолданып, есептеу немесе алгебралық түрлендіру орындайды.', 'Шешу қадамдарын жазады және жұбымен салыстырады.', 'Қатесін түзетіп, нәтижесін кері амалмен, орнына қоюмен немесе басқа тәсілмен тексереді.'],
+        descriptors: [{ text: 'есептің берілгендері мен қажетті математикалық әрекетті анықтайды', points: 1 }, { text: 'тиісті қасиет, формула немесе алгоритмді дұрыс қолданады', points: 1 }, { text: 'шешу қадамдарын математикалық тілде негіздейді', points: 1 }, { text: 'нәтижесін тексеріп, қорытынды жасайды', points: 1 }],
+        feedback: 'Дескриптор бойынша нақты қадамға берілген кері байланыстан кейін оқушы шешімін түзетеді.', resources: geometry ? ['Оқулық', 'Сызба немесе модель', 'Тапсырма парағы'] : ['Оқулық', 'Тапсырма парағы', 'Тақта'], support: 'Қажет оқушыға формула, сызба немесе алгоритмнің бастапқы қадамы беріледі; дайын оқушыға басқа тәсілмен шешу ұсынылады.'
+      },
+      {
+        name: 'Сабақтың соңы', minutes: 7, method: 'Шешімді түсіндір және тексер', workForm: 'Жеке жұмыс',
+        teacherActions: ['Оқу мақсатына сәйкес қысқа қорытынды тапсырма ұсынады.', 'Оқушының дәлелі мен тексеру тәсіліне сүйеніп келесі оқу қадамын белгілейді.'],
+        learnerActions: ['Қорытынды тапсырманы орындайды.', 'Қолданған тәсілін және нәтижені қалай тексергенін қысқаша түсіндіреді.'],
+        descriptors: [{ text: 'оқу мақсатына сәйкес қорытынды тапсырманы орындайды', points: 1 }, { text: 'шешу тәсілі мен тексеру нәтижесін түсіндіреді', points: 1 }],
+        feedback: 'Нақты дәлелге сүйенген қорытынды кері байланыс беріледі.', resources: ['Қорытынды тапсырма'], support: 'Сөйлем бастамасы немесе тексеру қадамы ұсынылады.'
+      }
+    ],
+    differentiation: 'Қолдауды қажет ететін оқушыға формула, сызба және кезеңдік нұсқаулық беріледі; жоғары дайындықтағы оқушы шешудің екінші тәсілін ұсынып, тиімділігін негіздейді.',
+    safety: 'Сыныптағы және цифрлық құралдармен жұмыс істеу қауіпсіздігі сақталады.'
+  };
+}
+
 function referenceContext(reference) {
   if (!reference) return 'Сәйкес мұғалімдік үлгі табылмады.';
   const stages = reference.stages.map(stage => ({
@@ -294,10 +329,10 @@ function referenceContext(reference) {
     learner: stage.learner, assessment: stage.assessment, resources: stage.resources
   }));
   return JSON.stringify({
-    sourceStatus: 'Мұғалім берген әдістемелік үлгі; нормативтік дерек емес',
+    sourceStatus: reference.source?.status === 'teacher-provided-ktz' ? 'Мұғалім берген КТЖ дерегі; оқу мақсаты мен тақырып көзі' : 'Мұғалім берген әдістемелік ҚМЖ үлгісі; нормативтік дерек емес',
     section: reference.section, topic: reference.topic, objectives: reference.objectives,
     lessonObjectives: reference.lesson_objectives, values: reference.values,
-    stages, knownIssues: reference.quality_flags
+    stages, methodologicalGuidance: reference.methodological_guidance || [], track: reference.track || '', knownIssues: reference.quality_flags
   }, null, 2).slice(0, 24000);
 }
 
@@ -380,11 +415,11 @@ function apiConfig() {
 
 async function generatePlan(body) {
   const reference = selectReference(body);
-  if (reference) return renderPlan(body, planFromReference(reference, body), 'Дайын ҚМЖ', reference);
+  if (reference?.stages?.length) return renderPlan(body, planFromReference(reference, body), 'Дайын ҚМЖ', reference);
   const config = apiConfig();
   if (!config.key) return renderPlan(body, planFromReference(reference, body), reference ? 'ҚМЖ базасы' : 'demo-template', reference);
   const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. Бір сабаққа арналған, мазмұны өзара үйлесімді 45 минуттық ҚМЖ құрастыр. Пайдаланушы берген оқу мақсатының коды мен тұжырымын ешқашан өзгертпе және ойдан жаңа оқу мақсатын қоспа. Тапсырмалар пәнге, сынып жасына, тақырыпқа және оқу мақсатына нақты сәйкес болсын; жалпылама немесе мағынасыз мәтін жазба. Әр тапсырма үшін өлшенетін дескриптор және кемінде 1 оң бүтін балл көрсет. Педагог әрекетінде нақты әдіс пен жұмыс формасын жаз. Кезең минуттарының қосындысы дәл 45 болсын. Қосылған мұғалімдік ҚМЖ үлгісін құрылым мен идея көзі ретінде пайдалан, бірақ ол нормативтік құжат емес: ішіндегі қате, 40 минуттық бөлу немесе тақырыпқа сәйкес емес тапсырманы қайталама. Дене шынықтыруда жүктеме, арақашықтық, құрал және қауіпсіздікті нақтыла. Тек JSON қайтар: {"lessonObjectives":["..."],"assessmentCriteria":["..."],"stages":[{"name":"...","minutes":8,"method":"...","workForm":"...","teacherActions":["..."],"learnerActions":["..."],"descriptors":[{"text":"...","points":1}],"feedback":"...","resources":["..."],"support":"..."}],"differentiation":"...","safety":"..."}.`;
-  const user = `Оқыту тілі: ${body.language}\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nӨЗГЕРТІЛМЕЙТІН оқу мақсаты: ${body.objective}\nСынып ерекшелігі: ${body.classProfile || 'көрсетілмеген'}\nҚолжетімді ресурстар: ${body.availableResources || 'көрсетілмеген'}\nҚосымша талап: ${body.extra || 'жоқ'}\n\nМҰҒАЛІМ БЕРГЕН АНЫҚТАМАЛЫҚ ҮЛГІ:\n${referenceContext(reference)}`;
+  const user = `Оқыту тілі: ${body.language}\nПән: ${body.subject}\nСынып: ${body.grade}\nТоқсан: ${body.term}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nӨЗГЕРТІЛМЕЙТІН оқу мақсаты: ${body.objective}\nСынып ерекшелігі: ${body.classProfile || 'көрсетілмеген'}\nҚолжетімді ресурстар: ${body.availableResources || 'көрсетілмеген'}\nҚосымша талап: ${body.extra || 'жоқ'}\n\nМҰҒАЛІМ БЕРГЕН АНЫҚТАМАЛЫҚ ДЕРЕК:\n${referenceContext(reference)}`;
   const headers = { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' };
   if (AI_PROVIDER !== 'openai') Object.assign(headers, { 'HTTP-Referer': process.env.PUBLIC_URL || `http://localhost:${PORT}`, 'X-Title': 'ernur-qmj' });
   try {
@@ -410,7 +445,8 @@ async function handleApi(req, res, pathname) {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const grade = url.searchParams.get('grade') || '';
       const subject = url.searchParams.get('subject') || '';
-      return sendJson(res, 200, { scope: referenceDatabase.source_scope, references: referenceSummaries(grade, subject) });
+      const term = Number(url.searchParams.get('term') || 0);
+      return sendJson(res, 200, { scope: referenceDatabase.source_scope, references: referenceSummaries(grade, subject, term) });
     }
     if (req.method === 'POST' && pathname === '/api/access/verify') {
       const body = await readJson(req);
@@ -479,8 +515,8 @@ async function handleApi(req, res, pathname) {
       const body = await readJson(req);
       const access = await verifyAccessCode(requestAccessCode(req, body), true, requestDeviceId(req));
       if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
-      const required = ['subject', 'grade', 'language', 'section', 'topic', 'objective'];
-      if (required.some(key => !String(body[key] || '').trim())) return sendJson(res, 400, { error: 'Пән, сынып, тіл, бөлім, тақырып және нақты оқу мақсатын толтырыңыз' });
+      const required = ['subject', 'grade', 'term', 'language', 'section', 'topic', 'objective'];
+      if (required.some(key => !String(body[key] || '').trim())) return sendJson(res, 400, { error: 'Пән, сынып, тоқсан, тіл, бөлім, тақырып және нақты оқу мақсатын толтырыңыз' });
       return sendJson(res, 200, await generatePlan(body));
     }
     return sendJson(res, 404, { error: 'API жолы табылмады' });

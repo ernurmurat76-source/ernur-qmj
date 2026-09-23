@@ -91,6 +91,7 @@ function payload() {
   return {
     subject: $('#subject').value,
     grade: $('#grade').value,
+    term: $('#term').value,
     language: $('#language').value,
     section: $('#section').value.trim(),
     topic: $('#topic').value.trim(),

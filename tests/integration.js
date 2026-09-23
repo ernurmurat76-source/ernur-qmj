@@ -75,17 +75,24 @@ async function main() {
     const thirdDeviceAuth = { ...teacherAuth, 'X-Device-Id': '33333333-3333-4333-8333-333333333333' };
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: secondDeviceAuth, body: '{}' })).status, 200);
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: thirdDeviceAuth, body: '{}' })).status, 403);
-    const references = await request('/api/references?grade=5-%D1%81%D1%8B%D0%BD%D1%8B%D0%BF&subject=%D0%9C%D0%B0%D1%82%D0%B5%D0%BC%D0%B0%D1%82%D0%B8%D0%BA%D0%B0', { headers: teacherAuth });
+    const references = await request('/api/references?grade=5-%D1%81%D1%8B%D0%BD%D1%8B%D0%BF&subject=%D0%9C%D0%B0%D1%82%D0%B5%D0%BC%D0%B0%D1%82%D0%B8%D0%BA%D0%B0&term=1', { headers: teacherAuth });
     assert.equal(references.status, 200);
     assert.equal(references.data.references.length, 39);
     assert.ok(references.data.references[0].topic);
     const selected = references.data.references[0];
-    const generatedFromBase = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', language: 'Қазақ тілі', section: selected.section, topic: selected.topic, objective: selected.objectives }) });
+    const generatedFromBase = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', term: '1', language: 'Қазақ тілі', section: selected.section, topic: selected.topic, objective: selected.objectives }) });
     assert.equal(generatedFromBase.status, 200);
     assert.equal(generatedFromBase.data.reference.id, selected.id);
     assert.ok(generatedFromBase.data.html.includes('45 минут'));
     assert.ok(generatedFromBase.data.html.includes('width:32.7%'));
-    const generated = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
+    const termTwo = await request('/api/references?grade=5-%D1%81%D1%8B%D0%BD%D1%8B%D0%BF&subject=%D0%9C%D0%B0%D1%82%D0%B5%D0%BC%D0%B0%D1%82%D0%B8%D0%BA%D0%B0&term=2', { headers: teacherAuth });
+    assert.equal(termTwo.data.references.length, 39);
+    const termTwoLesson = termTwo.data.references[0];
+    const generatedTermTwo = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', term: '2', language: 'Қазақ тілі', section: termTwoLesson.section, topic: termTwoLesson.topic, objective: termTwoLesson.objectives }) });
+    assert.equal(generatedTermTwo.status, 200);
+    assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
+    assert.ok(generatedTermTwo.data.html.includes('Үлгі–алгоритм–қолдану'));
+    const generated = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(generated.status, 200);
     assert.ok(generated.data.html.includes('45 минут'));
     const id = created.data.code.id;
@@ -101,7 +108,7 @@ async function main() {
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: thirdDeviceAuth, body: '{}' })).status, 200);
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'DELETE', headers: auth })).status, 200);
     assert.equal((await request('/api/admin/codes', { headers: auth })).data.codes.length, 0);
-    console.log('Admin CRUD, two-device access control, 275-reference database and 45-minute QMJ: OK');
+    console.log('Admin CRUD, two-device access control, 1439-reference four-term database and 45-minute QMJ: OK');
   } finally {
     app.kill();
     database.close();

@@ -1,0 +1,253 @@
+{
+  "source_file": "КТЖ .5-11сынып Математика.docx",
+  "existing_records_retained": 275,
+  "new_records": 1164,
+  "total_records": 1439,
+  "quality_flags": {
+    "curriculum_only_no_reference_flow": 1164,
+    "objective_without_code": 49,
+    "missing_objectives": 2
+  },
+  "coverage": {
+    "10-сынып Алгебра ЖМБ 2-тоқсан": {
+      "records": 32,
+      "with_codes": 31,
+      "missing_objectives": 0
+    },
+    "10-сынып Алгебра ЖМБ 3-тоқсан": {
+      "records": 42,
+      "with_codes": 41,
+      "missing_objectives": 0
+    },
+    "10-сынып Алгебра ЖМБ 4-тоқсан": {
+      "records": 29,
+      "with_codes": 26,
+      "missing_objectives": 0
+    },
+    "10-сынып Алгебра ҚГБ 2-тоқсан": {
+      "records": 23,
+      "with_codes": 22,
+      "missing_objectives": 0
+    },
+    "10-сынып Алгебра ҚГБ 3-тоқсан": {
+      "records": 32,
+      "with_codes": 31,
+      "missing_objectives": 0
+    },
+    "10-сынып Алгебра ҚГБ 4-тоқсан": {
+      "records": 23,
+      "with_codes": 22,
+      "missing_objectives": 0
+    },
+    "10-сынып Геометрия ЖМБ 2-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    },
+    "10-сынып Геометрия ЖМБ 3-тоқсан": {
+      "records": 19,
+      "with_codes": 18,
+      "missing_objectives": 0
+    },
+    "10-сынып Геометрия ЖМБ 4-тоқсан": {
+      "records": 15,
+      "with_codes": 13,
+      "missing_objectives": 0
+    },
+    "10-сынып Геометрия ҚГБ 2-тоқсан": {
+      "records": 8,
+      "with_codes": 7,
+      "missing_objectives": 0
+    },
+    "10-сынып Геометрия ҚГБ 3-тоқсан": {
+      "records": 11,
+      "with_codes": 11,
+      "missing_objectives": 0
+    },
+    "10-сынып Геометрия ҚГБ 4-тоқсан": {
+      "records": 7,
+      "with_codes": 6,
+      "missing_objectives": 0
+    },
+    "11-сынып Алгебра ЖМБ 2-тоқсан": {
+      "records": 32,
+      "with_codes": 31,
+      "missing_objectives": 0
+    },
+    "11-сынып Алгебра ЖМБ 3-тоқсан": {
+      "records": 40,
+      "with_codes": 39,
+      "missing_objectives": 0
+    },
+    "11-сынып Алгебра ЖМБ 4-тоқсан": {
+      "records": 28,
+      "with_codes": 27,
+      "missing_objectives": 0
+    },
+    "11-сынып Алгебра ҚГБ 2-тоқсан": {
+      "records": 23,
+      "with_codes": 22,
+      "missing_objectives": 0
+    },
+    "11-сынып Алгебра ҚГБ 3-тоқсан": {
+      "records": 32,
+      "with_codes": 31,
+      "missing_objectives": 0
+    },
+    "11-сынып Алгебра ҚГБ 4-тоқсан": {
+      "records": 23,
+      "with_codes": 22,
+      "missing_objectives": 0
+    },
+    "11-сынып Геометрия ЖМБ 2-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    },
+    "11-сынып Геометрия ЖМБ 3-тоқсан": {
+      "records": 20,
+      "with_codes": 19,
+      "missing_objectives": 0
+    },
+    "11-сынып Геометрия ЖМБ 4-тоқсан": {
+      "records": 16,
+      "with_codes": 13,
+      "missing_objectives": 2
+    },
+    "11-сынып Геометрия ҚГБ 2-тоқсан": {
+      "records": 8,
+      "with_codes": 7,
+      "missing_objectives": 0
+    },
+    "11-сынып Геометрия ҚГБ 3-тоқсан": {
+      "records": 10,
+      "with_codes": 10,
+      "missing_objectives": 0
+    },
+    "11-сынып Геометрия ҚГБ 4-тоқсан": {
+      "records": 8,
+      "with_codes": 7,
+      "missing_objectives": 0
+    },
+    "5-сынып Математика жалпы 2-тоқсан": {
+      "records": 39,
+      "with_codes": 38,
+      "missing_objectives": 0
+    },
+    "5-сынып Математика жалпы 3-тоқсан": {
+      "records": 53,
+      "with_codes": 52,
+      "missing_objectives": 0
+    },
+    "5-сынып Математика жалпы 4-тоқсан": {
+      "records": 37,
+      "with_codes": 36,
+      "missing_objectives": 0
+    },
+    "6-сынып Математика жалпы 2-тоқсан": {
+      "records": 39,
+      "with_codes": 38,
+      "missing_objectives": 0
+    },
+    "6-сынып Математика жалпы 3-тоқсан": {
+      "records": 53,
+      "with_codes": 52,
+      "missing_objectives": 0
+    },
+    "6-сынып Математика жалпы 4-тоқсан": {
+      "records": 37,
+      "with_codes": 36,
+      "missing_objectives": 0
+    },
+    "7-сынып Алгебра жалпы 2-тоқсан": {
+      "records": 24,
+      "with_codes": 23,
+      "missing_objectives": 0
+    },
+    "7-сынып Алгебра жалпы 3-тоқсан": {
+      "records": 30,
+      "with_codes": 29,
+      "missing_objectives": 0
+    },
+    "7-сынып Алгебра жалпы 4-тоқсан": {
+      "records": 26,
+      "with_codes": 25,
+      "missing_objectives": 0
+    },
+    "7-сынып Геометрия жалпы 2-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    },
+    "7-сынып Геометрия жалпы 3-тоқсан": {
+      "records": 20,
+      "with_codes": 19,
+      "missing_objectives": 0
+    },
+    "7-сынып Геометрия жалпы 4-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    },
+    "8-сынып Алгебра жалпы 2-тоқсан": {
+      "records": 23,
+      "with_codes": 22,
+      "missing_objectives": 0
+    },
+    "8-сынып Алгебра жалпы 3-тоқсан": {
+      "records": 32,
+      "with_codes": 31,
+      "missing_objectives": 0
+    },
+    "8-сынып Алгебра жалпы 4-тоқсан": {
+      "records": 23,
+      "with_codes": 22,
+      "missing_objectives": 0
+    },
+    "8-сынып Геометрия жалпы 2-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    },
+    "8-сынып Геометрия жалпы 3-тоқсан": {
+      "records": 21,
+      "with_codes": 20,
+      "missing_objectives": 0
+    },
+    "8-сынып Геометрия жалпы 4-тоқсан": {
+      "records": 15,
+      "with_codes": 14,
+      "missing_objectives": 0
+    },
+    "9-сынып Алгебра жалпы 2-тоқсан": {
+      "records": 24,
+      "with_codes": 23,
+      "missing_objectives": 0
+    },
+    "9-сынып Алгебра жалпы 3-тоқсан": {
+      "records": 30,
+      "with_codes": 29,
+      "missing_objectives": 0
+    },
+    "9-сынып Алгебра жалпы 4-тоқсан": {
+      "records": 25,
+      "with_codes": 24,
+      "missing_objectives": 0
+    },
+    "9-сынып Геометрия жалпы 2-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    },
+    "9-сынып Геометрия жалпы 3-тоқсан": {
+      "records": 20,
+      "with_codes": 19,
+      "missing_objectives": 0
+    },
+    "9-сынып Геометрия жалпы 4-тоқсан": {
+      "records": 16,
+      "with_codes": 15,
+      "missing_objectives": 0
+    }
+  }
+}
