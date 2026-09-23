@@ -3,7 +3,13 @@
 const $ = selector => document.querySelector(selector);
 let current = { html: '', text: '' };
 const ACCESS_STORAGE_KEY = 'ernur-qmj-access-code';
+const DEVICE_STORAGE_KEY = 'ernur-qmj-device-id';
 let accessCode = localStorage.getItem(ACCESS_STORAGE_KEY) || '';
+let deviceId = localStorage.getItem(DEVICE_STORAGE_KEY) || '';
+if (!deviceId) {
+  deviceId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Array.from(crypto.getRandomValues(new Uint32Array(4))).map(value => value.toString(16)).join('')}`;
+  localStorage.setItem(DEVICE_STORAGE_KEY, deviceId);
+}
 
 async function loadSubjects() {
   const subjects = await fetch('/subjects.json').then(response => response.json());
@@ -44,7 +50,7 @@ function unlockBuilder(code, expiresAt) {
 async function verifyCode(code) {
   const response = await fetch('/api/access/verify', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${code}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${code}`, 'X-Device-Id': deviceId },
     body: '{}'
   });
   const data = await response.json();
@@ -108,7 +114,7 @@ async function generate(event) {
   button.disabled = true;
   button.textContent = 'ҚМЖ құрастырылып жатыр...';
   try {
-    const response = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessCode}` }, body: JSON.stringify(payload()) });
+    const response = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessCode}`, 'X-Device-Id': deviceId }, body: JSON.stringify(payload()) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'ҚМЖ жасалмады');
     current = { html: data.html, text: data.text };
@@ -151,5 +157,6 @@ $('#changeCodeButton').addEventListener('click', () => lockBuilder());
 $('#copyButton').addEventListener('click', copyPlan);
 $('#printButton').addEventListener('click', () => window.print());
 $('#wordButton').addEventListener('click', downloadWord);
+$('#copyKaspi').addEventListener('click', async () => { await navigator.clipboard.writeText('4400430304147348'); toast('Kaspi карта нөмірі көшірілді'); });
 loadSubjects().catch(() => { $('#formError').textContent = 'Пәндер тізімі жүктелмеді'; });
 restoreAccess();

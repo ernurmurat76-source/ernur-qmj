@@ -69,8 +69,12 @@ async function main() {
     const created = await request('/api/admin/codes', { method: 'POST', headers: auth, body: JSON.stringify({ label: 'Тест мұғалім', days: 45 }) });
     assert.equal(created.status, 201);
     assert.match(created.data.code.code, /^ERNUR-[A-Z2-9]{5}-[A-Z2-9]{5}$/);
-    const teacherAuth = { 'Content-Type': 'application/json', Authorization: `Bearer ${created.data.code.code}` };
+    const teacherAuth = { 'Content-Type': 'application/json', Authorization: `Bearer ${created.data.code.code}`, 'X-Device-Id': '11111111-1111-4111-8111-111111111111' };
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: teacherAuth, body: '{}' })).status, 200);
+    const secondDeviceAuth = { ...teacherAuth, 'X-Device-Id': '22222222-2222-4222-8222-222222222222' };
+    const thirdDeviceAuth = { ...teacherAuth, 'X-Device-Id': '33333333-3333-4333-8333-333333333333' };
+    assert.equal((await request('/api/access/verify', { method: 'POST', headers: secondDeviceAuth, body: '{}' })).status, 200);
+    assert.equal((await request('/api/access/verify', { method: 'POST', headers: thirdDeviceAuth, body: '{}' })).status, 403);
     const references = await request('/api/references?grade=5-%D1%81%D1%8B%D0%BD%D1%8B%D0%BF&subject=%D0%9C%D0%B0%D1%82%D0%B5%D0%BC%D0%B0%D1%82%D0%B8%D0%BA%D0%B0', { headers: teacherAuth });
     assert.equal(references.status, 200);
     assert.equal(references.data.references.length, 39);
@@ -91,9 +95,13 @@ async function main() {
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'extend', days: 30 }) })).status, 200);
     const list = await request('/api/admin/codes', { headers: auth });
     assert.equal(list.data.codes.length, 1);
+    assert.ok(list.data.codes[0].bound_device_1);
+    assert.ok(list.data.codes[0].bound_device_2);
+    assert.equal((await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'reset_device' }) })).status, 200);
+    assert.equal((await request('/api/access/verify', { method: 'POST', headers: thirdDeviceAuth, body: '{}' })).status, 200);
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'DELETE', headers: auth })).status, 200);
     assert.equal((await request('/api/admin/codes', { headers: auth })).data.codes.length, 0);
-    console.log('Admin CRUD, access control, 275-reference database and 45-minute QMJ: OK');
+    console.log('Admin CRUD, two-device access control, 275-reference database and 45-minute QMJ: OK');
   } finally {
     app.kill();
     database.close();

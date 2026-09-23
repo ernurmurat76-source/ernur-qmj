@@ -68,12 +68,13 @@ function renderCodes() {
   $('#codesBody').innerHTML = codes.map(item => {
     const status = statusOf(item);
     const days = remainingDays(item.expires_at);
+    const deviceCount = Number(Boolean(item.bound_device_1)) + Number(Boolean(item.bound_device_2));
     return `<tr>
       <td><strong>${escapeHtml(item.label || 'Атаусыз мұғалім')}</strong><code>${escapeHtml(item.code)}</code><button class="mini-copy" data-copy="${escapeHtml(item.code)}">Көшіру</button></td>
       <td><span class="code-status ${status.key}">${status.text}</span></td>
       <td><strong>${days} күн қалды</strong><small>${formatDate(item.expires_at)}</small></td>
-      <td><strong>${Number(item.usage_count || 0)} рет</strong><small>${formatDate(item.last_used_at)}</small></td>
-      <td><div class="row-actions"><button data-action="extend" data-id="${item.id}">Ұзарту</button><button data-action="toggle" data-active="${!item.is_active}" data-id="${item.id}">${item.is_active ? 'Тоқтату' : 'Қосу'}</button><button class="danger" data-action="delete" data-id="${item.id}">Жою</button></div></td>
+      <td><strong>${Number(item.usage_count || 0)} рет</strong><small>${formatDate(item.last_used_at)}</small><small>Құрылғы: ${deviceCount}/2</small></td>
+      <td><div class="row-actions"><button data-action="extend" data-id="${item.id}">Ұзарту</button><button data-action="toggle" data-active="${!item.is_active}" data-id="${item.id}">${item.is_active ? 'Тоқтату' : 'Қосу'}</button>${deviceCount ? `<button data-action="reset_device" data-id="${item.id}">Құрылғыларды босату</button>` : ''}<button class="danger" data-action="delete" data-id="${item.id}">Жою</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -149,6 +150,10 @@ $('#codesBody').addEventListener('click', async event => {
       if (!Number.isInteger(days) || days < 1 || days > 365) return days ? toast('1–365 аралығындағы күн санын енгізіңіз') : undefined;
       await api(`/api/admin/codes/${item.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'extend', days }) });
       toast(`Код ${days} күнге ұзартылды`);
+    } else if (button.dataset.action === 'reset_device') {
+      if (!confirm('Осы кодқа байланысқан екі құрылғыны босатасыз ба?')) return;
+      await api(`/api/admin/codes/${item.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reset_device' }) });
+      toast('Құрылғылар босатылды');
     }
     await loadCodes();
   } catch (error) { toast(error.message); }

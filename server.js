@@ -85,15 +85,48 @@ function verifyAdminSession(token) {
   } catch { return false; }
 }
 
-async function verifyAccessCode(code, trackUsage = false) {
+function deviceFingerprint(deviceId) {
+  const normalized = String(deviceId || '').trim();
+  if (!/^[a-zA-Z0-9-]{20,80}$/.test(normalized)) return '';
+  return crypto.createHmac('sha256', ACCESS_CODE_SECRET).update(`device:${normalized}`).digest('hex');
+}
+
+async function verifyAccessCode(code, trackUsage = false, deviceId = '') {
   if (!databaseReady()) return { ok: false, status: 503, error: 'Код дерекқоры серверде бапталмаған' };
   const normalized = String(code || '').trim().toUpperCase();
+  const fingerprint = deviceFingerprint(deviceId);
+  if (!fingerprint) return { ok: false, status: 400, error: 'Құрылғы белгісі табылмады. Бетті жаңартып көріңіз' };
   if (!/^ERNUR-[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(normalized)) return { ok: false, status: 401, error: 'Кіру коды қате' };
-  const rows = await dbRequest(`access_codes?code=eq.${encodeURIComponent(normalized)}&select=id,code,duration_days,expires_at,is_active,usage_count&limit=1`);
-  const record = rows?.[0];
+  const select = 'id,code,duration_days,expires_at,is_active,usage_count,bound_device_1,bound_device_2,bound_device_1_at,bound_device_2_at';
+  const rows = await dbRequest(`access_codes?code=eq.${encodeURIComponent(normalized)}&select=${select}&limit=1`);
+  let record = rows?.[0];
   if (!record) return { ok: false, status: 401, error: 'Кіру коды қате' };
   if (!record.is_active) return { ok: false, status: 401, error: 'Бұл кіру кодын әкімші тоқтатқан' };
   if (new Date(record.expires_at).getTime() <= Date.now()) return { ok: false, status: 401, error: 'Кіру кодының мерзімі аяқталған' };
+  const matchesDevice = item => [item?.bound_device_1, item?.bound_device_2].some(value => value && safeEqual(value, fingerprint));
+  if (!matchesDevice(record) && !record.bound_device_1) {
+    const bound = await dbRequest(`access_codes?id=eq.${encodeURIComponent(record.id)}&bound_device_1=is.null`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ bound_device_1: fingerprint, bound_device_1_at: new Date().toISOString() })
+    });
+    if (bound?.[0]) record = bound[0];
+    else {
+      const latest = await dbRequest(`access_codes?id=eq.${encodeURIComponent(record.id)}&select=${select}&limit=1`);
+      record = latest?.[0];
+    }
+  }
+  if (!matchesDevice(record) && !record.bound_device_2) {
+    const bound = await dbRequest(`access_codes?id=eq.${encodeURIComponent(record.id)}&bound_device_2=is.null`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ bound_device_2: fingerprint, bound_device_2_at: new Date().toISOString() })
+    });
+    if (bound?.[0]) record = bound[0];
+    else {
+      const latest = await dbRequest(`access_codes?id=eq.${encodeURIComponent(record.id)}&select=${select}&limit=1`);
+      record = latest?.[0];
+    }
+  }
+  if (!matchesDevice(record)) return { ok: false, status: 403, error: 'Бұл код екі құрылғыға бекітілген. Үшінші құрылғыдан кіруге болмайды' };
   if (trackUsage) {
     dbRequest(`access_codes?id=eq.${encodeURIComponent(record.id)}`, {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
@@ -106,6 +139,10 @@ async function verifyAccessCode(code, trackUsage = false) {
 function requestAccessCode(req, body = {}) {
   const authorization = String(req.headers.authorization || '');
   return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : String(body.accessCode || '').trim();
+}
+
+function requestDeviceId(req) {
+  return String(req.headers['x-device-id'] || '').trim();
 }
 
 function requestBearer(req) {
@@ -368,7 +405,7 @@ async function handleApi(req, res, pathname) {
   try {
     if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET && databaseReady()), referenceCount: referenceDatabase.records.length });
     if (req.method === 'GET' && pathname === '/api/references') {
-      const access = await verifyAccessCode(requestAccessCode(req));
+      const access = await verifyAccessCode(requestAccessCode(req), false, requestDeviceId(req));
       if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const grade = url.searchParams.get('grade') || '';
@@ -377,7 +414,7 @@ async function handleApi(req, res, pathname) {
     }
     if (req.method === 'POST' && pathname === '/api/access/verify') {
       const body = await readJson(req);
-      const result = await verifyAccessCode(requestAccessCode(req, body));
+      const result = await verifyAccessCode(requestAccessCode(req, body), false, requestDeviceId(req));
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
       return sendJson(res, 200, { ok: true, expiresAt: result.record.expires_at, days: result.record.duration_days });
     }
@@ -395,7 +432,7 @@ async function handleApi(req, res, pathname) {
     if (pathname.startsWith('/api/admin/codes')) {
       if (!verifyAdminSession(requestBearer(req))) return sendJson(res, 401, { error: 'Әкімші сессиясы аяқталған. Қайта кіріңіз' });
       if (req.method === 'GET' && pathname === '/api/admin/codes') {
-        const rows = await dbRequest('access_codes?select=id,code,label,duration_days,created_at,expires_at,is_active,last_used_at,usage_count&order=created_at.desc');
+        const rows = await dbRequest('access_codes?select=id,code,label,duration_days,created_at,expires_at,is_active,last_used_at,usage_count,bound_device_1,bound_device_2,bound_device_1_at,bound_device_2_at,device_reset_count&order=created_at.desc');
         return sendJson(res, 200, { codes: rows || [] });
       }
       if (req.method === 'POST' && pathname === '/api/admin/codes') {
@@ -421,6 +458,11 @@ async function handleApi(req, res, pathname) {
         const body = await readJson(req);
         let updates;
         if (body.action === 'toggle') updates = { is_active: Boolean(body.isActive) };
+        else if (body.action === 'reset_device') {
+          const rows = await dbRequest(`access_codes?id=eq.${id}&select=device_reset_count&limit=1`);
+          if (!rows?.[0]) return sendJson(res, 404, { error: 'Код табылмады' });
+          updates = { bound_device_1: null, bound_device_2: null, bound_device_1_at: null, bound_device_2_at: null, device_reset_count: Number(rows[0].device_reset_count || 0) + 1 };
+        }
         else if (body.action === 'extend') {
           const days = Number(body.days);
           if (!Number.isInteger(days) || days < 1 || days > 365) return sendJson(res, 400, { error: 'Ұзарту мерзімі 1–365 күн болуы керек' });
@@ -435,7 +477,7 @@ async function handleApi(req, res, pathname) {
     }
     if (req.method === 'POST' && pathname === '/api/generate') {
       const body = await readJson(req);
-      const access = await verifyAccessCode(requestAccessCode(req, body), true);
+      const access = await verifyAccessCode(requestAccessCode(req, body), true, requestDeviceId(req));
       if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
       const required = ['subject', 'grade', 'language', 'section', 'topic', 'objective'];
       if (required.some(key => !String(body[key] || '').trim())) return sendJson(res, 400, { error: 'Пән, сынып, тіл, бөлім, тақырып және нақты оқу мақсатын толтырыңыз' });
