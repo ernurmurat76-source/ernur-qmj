@@ -76,10 +76,11 @@ async function main() {
     assert.equal(references.data.references.length, 39);
     assert.ok(references.data.references[0].topic);
     const selected = references.data.references[0];
-    const generatedFromBase = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', language: 'Қазақ тілі', section: selected.section, topic: selected.topic, objective: selected.objectives, referenceId: selected.id }) });
+    const generatedFromBase = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', language: 'Қазақ тілі', section: selected.section, topic: selected.topic, objective: selected.objectives }) });
     assert.equal(generatedFromBase.status, 200);
     assert.equal(generatedFromBase.data.reference.id, selected.id);
     assert.ok(generatedFromBase.data.html.includes('45 минут'));
+    assert.ok(generatedFromBase.data.html.includes('width:32.7%'));
     const generated = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(generated.status, 200);
     assert.ok(generated.data.html.includes('45 минут'));

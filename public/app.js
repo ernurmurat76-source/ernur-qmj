@@ -2,7 +2,6 @@
 
 const $ = selector => document.querySelector(selector);
 let current = { html: '', text: '' };
-let referenceLessons = [];
 const ACCESS_STORAGE_KEY = 'ernur-qmj-access-code';
 let accessCode = localStorage.getItem(ACCESS_STORAGE_KEY) || '';
 
@@ -40,48 +39,6 @@ function unlockBuilder(code, expiresAt) {
   $('#accessStatus').classList.remove('hidden');
   $('#builderLayout').classList.remove('hidden');
   $('#accessExpiry').textContent = `${formatExpiry(expiresAt)} дейін жарамды`;
-  loadReferences();
-}
-
-function referenceLabel(item) {
-  const number = item.lessonNumbers?.length ? `${item.lessonNumbers.join('–')}-сабақ · ` : '';
-  return `${number}${item.topic}`;
-}
-
-async function loadReferences() {
-  const select = $('#referenceLesson');
-  const grade = $('#grade').value;
-  const subject = $('#subject').value;
-  referenceLessons = [];
-  select.replaceChildren(new Option('Алдымен пән мен сыныпты таңдаңыз', ''));
-  select.disabled = true;
-  if (!accessCode || !grade || !subject) return;
-  select.replaceChildren(new Option('ҚМЖ базасы жүктеліп жатыр...', ''));
-  try {
-    const url = `/api/references?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(subject)}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessCode}` } });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'ҚМЖ базасы жүктелмеді');
-    referenceLessons = data.references || [];
-    select.replaceChildren(new Option(referenceLessons.length ? 'Дайын сабақты таңдаңыз' : 'Бұл пән мен сыныпқа дайын база жоқ', ''));
-    for (const item of referenceLessons) select.add(new Option(referenceLabel(item), item.id));
-    select.disabled = !referenceLessons.length;
-    $('#referenceHint').textContent = referenceLessons.length
-      ? `Базадан ${referenceLessons.length} сабақ табылды. Сабақты таңдағанда мәліметтер автоматты толтырылады.`
-      : 'Бұл пән мен сынып бойынша дайын үлгі жоқ. Мәліметтерді қолмен толтырып, ЖИ арқылы ҚМЖ жасай аласыз.';
-  } catch (error) {
-    select.replaceChildren(new Option('ҚМЖ базасы уақытша жүктелмеді', ''));
-    $('#referenceHint').textContent = error.message;
-  }
-}
-
-function applyReference() {
-  const item = referenceLessons.find(reference => reference.id === $('#referenceLesson').value);
-  if (!item) return;
-  $('#section').value = item.section || '';
-  $('#topic').value = item.topic || '';
-  $('#objective').value = item.objectives || '';
-  toast('Сабақ мәліметтері базадан толтырылды');
 }
 
 async function verifyCode(code) {
@@ -139,8 +96,7 @@ function payload() {
     absent: $('#absent').value,
     classProfile: $('#classProfile').value.trim(),
     availableResources: $('#availableResources').value.trim(),
-    extra: $('#extra').value.trim(),
-    referenceId: $('#referenceLesson').value
+    extra: $('#extra').value.trim()
   };
 }
 
@@ -157,7 +113,7 @@ async function generate(event) {
     if (!response.ok) throw new Error(data.error || 'ҚМЖ жасалмады');
     current = { html: data.html, text: data.text };
     $('#result').innerHTML = data.html;
-    $('#modelLabel').textContent = data.reference ? `ЖИ · ҚМЖ базасы: ${data.reference.topic}` : (data.model === 'demo-template' ? 'Демо құрылым' : 'ЖИ арқылы');
+    $('#modelLabel').textContent = data.model === 'demo-template' ? 'Дайын құрылым' : 'ҚМЖ дайын';
     $('#emptyResult').classList.add('hidden');
     $('#resultContent').classList.remove('hidden');
     if (window.innerWidth < 900) $('#resultCard').scrollIntoView({ behavior: 'smooth' });
@@ -180,7 +136,7 @@ async function copyPlan() {
 function downloadWord() {
   if (!current.html) return;
   const topic = $('#topic').value.trim() || 'QMJ';
-  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:1.2cm}body{font-family:'Times New Roman';font-size:12pt}h2,h3{text-align:center}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:6px;vertical-align:top}ul{margin:0;padding-left:18px}.flow-table th:nth-child(1){width:13%}.flow-table th:nth-child(2){width:26%}.flow-table th:nth-child(3){width:21%}.flow-table th:nth-child(4){width:26%}.flow-table th:nth-child(5){width:14%}.legal-note{font-size:10pt;text-align:center}.method-notes{margin-top:16px}</style></head><body>${current.html}</body></html>`;
+  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:1cm 1.5cm 1cm 1.25cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15}h2,h3{text-align:center;font-size:12pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:4px;vertical-align:top}.meta-table th{width:auto;text-align:left;background:#fff}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table .flow-title th{font-size:12pt}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:16px}.legal-note{font-size:10pt;text-align:center}.method-notes{margin-top:12px;font-size:12pt}</style></head><body>${current.html}</body></html>`;
   const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -195,8 +151,5 @@ $('#changeCodeButton').addEventListener('click', () => lockBuilder());
 $('#copyButton').addEventListener('click', copyPlan);
 $('#printButton').addEventListener('click', () => window.print());
 $('#wordButton').addEventListener('click', downloadWord);
-$('#subject').addEventListener('change', loadReferences);
-$('#grade').addEventListener('change', loadReferences);
-$('#referenceLesson').addEventListener('change', applyReference);
 loadSubjects().catch(() => { $('#formError').textContent = 'Пәндер тізімі жүктелмеді'; });
 restoreAccess();
