@@ -73,10 +73,13 @@ def main() -> int:
             errors.append(f'{record.get("id")}: Атамұра оқулығымен сәйкестік көрсетілмеген')
         if record.get("textbook_alignment", {}).get("publisher") != "Атамұра":
             errors.append(f'{record.get("id")}: оқулық дереккөзі белгіленбеген')
-        for visual in plan.get("visuals") or []:
+        visuals = plan.get("visuals") or []
+        if len(visuals) != 1 or visuals[0].get("kind") != "textbook-excerpt":
+            errors.append(f'{record.get("id")}: оқулық тапсырмасының қиындысы тіркелмеген')
+        for visual in visuals:
             src = str(visual.get("src", ""))
             visual_file = path.parent.parent / "public" / src.lstrip("/")
-            if not src.startswith("/visuals/") or not visual_file.is_file():
+            if not src.startswith("/textbook-excerpts/task-") or not src.endswith(".jpg") or not visual_file.is_file():
                 errors.append(f'{record.get("id")}: көрнекілік файлы табылмады: {src}')
 
     counts = Counter((record.get("grade"), record.get("subject"), record.get("track", ""), record.get("term")) for record in new_records)
@@ -101,6 +104,7 @@ def main() -> int:
         "atamura_aligned": sum(record.get("textbook_alignment", {}).get("publisher") == "Атамұра" for record in new_records),
         "teacher_template_plans": sum(record.get("prepared_plan", {}).get("templateStatus") == "teacher-provided-qmj-structure" for record in new_records),
         "textbook_page_bound": sum(bool(record.get("prepared_plan", {}).get("textbookPageBinding")) for record in new_records),
+        "textbook_excerpt_embedded": sum(bool(record.get("prepared_plan", {}).get("visuals")) for record in new_records),
         "covered_groups": len(counts),
         "errors": errors,
     }

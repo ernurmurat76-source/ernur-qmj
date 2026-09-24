@@ -109,6 +109,13 @@ async function main() {
     assert.equal(generatedTermTwo.status, 200);
     assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
     assert.ok(generatedTermTwo.data.html.includes('1-тапсырма.'));
+    assert.ok(generatedTermTwo.data.html.includes('/textbook-excerpts/task-'));
+    assert.ok(generatedTermTwo.data.html.includes('Суреттегі тақырыпқа сай тапсырмаларды орында'));
+    const excerptPath = generatedTermTwo.data.html.match(/\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg/)[0];
+    const excerptResponse = await fetch(`http://127.0.0.1:${appPort}${excerptPath}`);
+    assert.equal(excerptResponse.status, 200);
+    assert.equal(excerptResponse.headers.get('content-type'), 'image/jpeg');
+    assert.ok((await excerptResponse.arrayBuffer()).byteLength > 10000);
     assert.ok(!generatedTermTwo.data.html.includes('бағдарлық PDF беті'));
     assert.ok(!generatedTermTwo.data.html.includes('Атамұра оқулығы'));
     assert.ok(!generatedTermTwo.data.html.includes('КТЖ-да берілген оқу мақсатына сәйкес'));
@@ -127,9 +134,12 @@ async function main() {
     assert.ok(clientScript.includes('Content-ID: <${attachment.cid}>'));
     assert.ok(clientScript.includes('padding:2pt'));
     assert.ok(clientScript.includes('line-height:1.0'));
-    assert.ok(clientScript.includes('max-height:150pt'));
+    assert.ok(clientScript.includes('max-height:240pt'));
+    assert.ok(clientScript.includes('img[src^="/textbook-excerpts/"]'));
     assert.ok(clientScript.includes('JSZip.loadAsync'));
     assert.ok(clientScript.includes('updateReferenceDocumentXml'));
+    assert.ok(clientScript.includes("String(fields.teacher || '').trim() || '____________________________'"));
+    assert.ok(clientScript.includes('Умбетова\\s+Меруерт\\s+Мирзамидиновна'));
     assert.equal(generatedTermTwo.data.model, 'Дайын ҚМЖ базасы · ЖИ қолданылмады');
     const blockedSubject = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(blockedSubject.status, 403);

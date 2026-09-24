@@ -19,7 +19,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ACCESS_CODE_SECRET = process.env.ACCESS_CODE_SECRET || '';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 const loginAttempts = new Map();
 let referenceDatabase = { records: [] };
 try {
@@ -424,7 +424,7 @@ function normalizePlan(raw, body, reference = null) {
       points: Math.max(1, Math.round(Number(item?.points) || 1))
     })).filter(item => item.instruction && item.descriptor),
     visuals: (Array.isArray(stage?.visuals) ? stage.visuals : []).map(item => ({
-      src: /^\/visuals\/[a-z0-9-]+\.svg$/i.test(String(item?.src || '')) ? String(item.src) : '',
+      src: /^(?:\/visuals\/[a-z0-9-]+\.svg|\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item?.src || '')) ? String(item.src) : '',
       alt: String(item?.alt || 'Математикалық сызба').trim(),
       caption: String(item?.caption || '').trim()
     })).filter(item => item.src).slice(0, 2),
@@ -441,7 +441,7 @@ function normalizePlan(raw, body, reference = null) {
     differentiation: String(raw?.differentiation || fallback.differentiation).trim(),
     safety: String(raw?.safety || fallback.safety).trim(),
     visuals: (Array.isArray(raw?.visuals) ? raw.visuals : []).map(item => ({
-      src: /^\/visuals\/[a-z0-9-]+\.svg$/i.test(String(item?.src || '')) ? String(item.src) : '',
+      src: /^(?:\/visuals\/[a-z0-9-]+\.svg|\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item?.src || '')) ? String(item.src) : '',
       alt: String(item?.alt || 'Математикалық сызба').trim(),
       caption: String(item?.caption || '').trim()
     })).filter(item => item.src).slice(0, 2),
@@ -466,7 +466,7 @@ function renderPlan(body, plan, model, reference = null) {
   const rows = displayStages.map(stage => {
     const tasks = (stage.tasks || []).map(task => `<div class="lesson-task"><p><strong>${task.number}-тапсырма.</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p></div>`).join('');
     const visuals = (stage.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
-    const teacher = `${list(stage.teacherActions)}${tasks}${visuals}`;
+    const teacher = `${list(stage.teacherActions)}${visuals}${tasks}`;
     const bbuTable = stage.name === 'Сабақтың соңы' ? '<table class="bbu-table"><thead><tr><th>Білемін</th><th>Білгім келеді</th><th>Үйрендім</th></tr></thead><tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table>' : '';
     const learner = `${list(stage.learnerActions)}${bbuTable}`;
     const stageDescriptors = (stage.descriptors || []).length ? `<p><strong>Дескриптор:</strong></p>${list(stage.descriptors.map(item => `${item.text} — ${item.points} балл`))}` : '';
