@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const REFERENCE_PATH = path.join(__dirname, 'data', 'qmj-reference-index.json');
+const REFERENCE_DOCX_DIR = path.join(__dirname, 'data', 'reference-docx');
 const SUBJECTS = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'subjects.json'), 'utf8'));
 const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openrouter').toLowerCase();
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
@@ -18,7 +19,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ACCESS_CODE_SECRET = process.env.ACCESS_CODE_SECRET || '';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 const loginAttempts = new Map();
 let referenceDatabase = { records: [] };
 try {
@@ -249,6 +250,9 @@ function selectReference(body) {
   let bestScore = 0;
   for (const item of candidates) {
     let score = 0;
+    const itemTopic = String(item.topic || '').toLocaleLowerCase('kk-KZ').replace(/\s+/g, ' ').trim();
+    const requestedTopic = String(body.topic || '').toLocaleLowerCase('kk-KZ').replace(/\s+/g, ' ').trim();
+    if (itemTopic && itemTopic === requestedTopic) score += 40;
     if (objectiveCodes.some(code => item.objective_codes?.includes(code))) score += 12;
     const words = normalizedWords(`${item.topic} ${item.section}`);
     for (const word of topicWords) if (words.has(word)) score += 1;
@@ -463,14 +467,17 @@ function renderPlan(body, plan, model, reference = null) {
     const tasks = (stage.tasks || []).map(task => `<div class="lesson-task"><p><strong>${task.number}-тапсырма.</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p></div>`).join('');
     const visuals = (stage.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
     const teacher = `${list(stage.teacherActions)}${tasks}${visuals}`;
+    const bbuTable = stage.name === 'Сабақтың соңы' ? '<table class="bbu-table"><thead><tr><th>Білемін</th><th>Білгім келеді</th><th>Үйрендім</th></tr></thead><tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table>' : '';
+    const learner = `${list(stage.learnerActions)}${bbuTable}`;
     const stageDescriptors = (stage.descriptors || []).length ? `<p><strong>Дескриптор:</strong></p>${list(stage.descriptors.map(item => `${item.text} — ${item.points} балл`))}` : '';
     const assessment = `${stageDescriptors}<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
-    return `<tr><td><strong>${escapeHtml(stage.name)}</strong><br>${stage.minutes} минут</td><td>${teacher}</td><td>${list(stage.learnerActions)}</td><td>${assessment}</td><td>${list(stage.resources)}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(stage.name)}</strong><br>${stage.minutes} минут</td><td>${teacher}</td><td>${learner}</td><td>${assessment}</td><td>${list(stage.resources)}</td></tr>`;
   }).join('');
   const valuesRow = reference?.values ? `<tr><th>Құндылықтар</th><td>${escapeHtml(reference.values)}</td></tr>` : '';
-  const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><colgroup><col style="width:28.4%"><col style="width:71.6%"></colgroup><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысқандар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr>${valuesRow}</table><table class="flow-table"><colgroup><col style="width:8.8%"><col style="width:32.7%"><col style="width:35.3%"><col style="width:11.8%"><col style="width:11.4%"></colgroup><thead><tr class="flow-title"><th colspan="5">Сабақ барысы: 45 минут</th></tr><tr><th>Уақыты/кезеңдері</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table></article>`;
+  const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><colgroup><col style="width:28.4%"><col style="width:71.6%"></colgroup><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысқандар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr>${valuesRow}</table><p class="flow-heading"><strong>Сабақ барысы: 45 минут</strong></p><table class="flow-table"><colgroup><col style="width:8.8%"><col style="width:32.7%"><col style="width:35.3%"><col style="width:11.8%"><col style="width:11.4%"></colgroup><thead><tr><th>Уақыты/кезеңдері</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table></article>`;
   const text = `Қысқа мерзімді (сабақ) жоспары\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nОқу мақсаты: ${body.objective}`;
-  return { html, text, model, format: 'qmj-130', reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
+  const referenceDocx = reference?.term === 1 && fs.existsSync(path.join(REFERENCE_DOCX_DIR, `${reference.id}.docx`)) ? `/api/reference-docx/${reference.id}` : null;
+  return { html, text, model, format: 'qmj-130', referenceDocx, reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
 }
 
 function apiConfig() {
@@ -504,6 +511,27 @@ async function generatePlan(body) {
 
 async function handleApi(req, res, pathname) {
   try {
+    const referenceDocxMatch = pathname.match(/^\/api\/reference-docx\/([0-9a-f]{16})$/i);
+    if (req.method === 'GET' && referenceDocxMatch) {
+      const access = await verifyAccessCode(requestAccessCode(req, {}), false, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
+      const reference = referenceDatabase.records.find(item => item.id === referenceDocxMatch[1] && item.term === 1);
+      if (!reference) return sendJson(res, 404, { error: 'Бастапқы ҚМЖ табылмады' });
+      if (!codeAllowsSubject(access.record, reference.subject)) return sendJson(res, 403, { error: 'Бұл пәнге рұқсат жоқ' });
+      const file = path.join(REFERENCE_DOCX_DIR, `${reference.id}.docx`);
+      try {
+        const data = await fs.promises.readFile(file);
+        res.writeHead(200, {
+          'Content-Type': MIME['.docx'],
+          'Content-Length': data.length,
+          'Cache-Control': 'private, no-store',
+          'Content-Disposition': `attachment; filename="qmj-${reference.id}.docx"`
+        });
+        return res.end(data);
+      } catch {
+        return sendJson(res, 404, { error: 'Бастапқы ҚМЖ файлы табылмады' });
+      }
+    }
     if (req.method === 'GET' && pathname === '/api/health') return sendJson(res, 200, { ok: true, provider: AI_PROVIDER, aiReady: Boolean(apiConfig().key), accessReady: Boolean(ADMIN_PASSWORD && ACCESS_CODE_SECRET && databaseReady()), referenceCount: referenceDatabase.records.length });
     if (req.method === 'GET' && pathname === '/api/references') {
       const access = await verifyAccessCode(requestAccessCode(req), false, requestDeviceId(req));

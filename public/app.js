@@ -124,10 +124,11 @@ async function generate(event) {
   button.disabled = true;
   button.textContent = 'ҚМЖ құрастырылып жатыр...';
   try {
-    const response = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessCode}`, 'X-Device-Id': deviceId }, body: JSON.stringify(payload()) });
+    const formValues = payload();
+    const response = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessCode}`, 'X-Device-Id': deviceId }, body: JSON.stringify(formValues) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'ҚМЖ жасалмады');
-    current = { html: data.html, text: data.text };
+    current = { html: data.html, text: data.text, referenceDocx: data.referenceDocx || '', fields: formValues };
     $('#result').innerHTML = data.html;
     $('#modelLabel').textContent = data.model === 'demo-template' ? 'Дайын құрылым' : 'ҚМЖ дайын';
     $('#emptyResult').classList.add('hidden');
@@ -191,9 +192,75 @@ async function visualToPngBase64(src) {
   }
 }
 
+function setDocxCellText(xml, cell, value) {
+  const namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  let texts = [...cell.getElementsByTagNameNS(namespace, 't')];
+  if (!texts.length) {
+    let paragraph = cell.getElementsByTagNameNS(namespace, 'p')[0];
+    if (!paragraph) {
+      paragraph = xml.createElementNS(namespace, 'w:p');
+      cell.appendChild(paragraph);
+    }
+    let run = paragraph.getElementsByTagNameNS(namespace, 'r')[0];
+    if (!run) {
+      run = xml.createElementNS(namespace, 'w:r');
+      paragraph.appendChild(run);
+    }
+    const text = xml.createElementNS(namespace, 'w:t');
+    run.appendChild(text);
+    texts = [text];
+  }
+  texts[0].textContent = value;
+  texts.slice(1).forEach(text => { text.textContent = ''; });
+}
+
+function updateReferenceDocumentXml(source, fields) {
+  const namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const xml = new DOMParser().parseFromString(source, 'application/xml');
+  const rows = [...xml.getElementsByTagNameNS(namespace, 'tr')];
+  for (const row of rows) {
+    const cells = [...row.children].filter(item => item.localName === 'tc');
+    if (!cells.length) continue;
+    const cellText = cell => [...cell.getElementsByTagNameNS(namespace, 't')].map(item => item.textContent || '').join('');
+    const label = cellText(cells[0]).replace(/\s+/g, ' ').trim();
+    if (/Педагогтің.*аты-жөні/i.test(label) && fields.teacher && cells[1]) setDocxCellText(xml, cells[cells.length - 1], fields.teacher);
+    else if (/^Күні/i.test(label) && fields.date && cells[1]) setDocxCellText(xml, cells[cells.length - 1], fields.date);
+    else if (/^Сынып/i.test(label)) {
+      setDocxCellText(xml, cells[0], `Сынып: ${fields.grade || ''}`);
+      if (cells[1]) setDocxCellText(xml, cells[cells.length - 1], `Қатысқандар саны: ${fields.present || '____'}    Қатыспағандар саны: ${fields.absent || '____'}`);
+    }
+    else if (/^Сабақ барысы/i.test(label)) setDocxCellText(xml, cells[0], 'Сабақ барысы: 45 минут');
+  }
+  return new XMLSerializer().serializeToString(xml);
+}
+
+async function downloadReferenceWord(topic) {
+  const response = await fetch(current.referenceDocx, { headers: { Authorization: `Bearer ${accessCode}`, 'X-Device-Id': deviceId } });
+  if (!response.ok) throw new Error('Бастапқы ҚМЖ файлы жүктелмеді');
+  const zip = await JSZip.loadAsync(await response.arrayBuffer());
+  const documentFile = zip.file('word/document.xml');
+  if (!documentFile) throw new Error('Word құжатының құрылымы оқылмады');
+  const xml = await documentFile.async('string');
+  zip.file('word/document.xml', updateReferenceDocumentXml(xml, current.fields || {}));
+  const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', compression: 'DEFLATE' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `ҚМЖ-${topic.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.docx`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 async function downloadWord() {
   if (!current.html) return;
   const topic = $('#topic').value.trim() || 'QMJ';
+  if (current.referenceDocx && window.JSZip) {
+    try {
+      await downloadReferenceWord(topic);
+      return;
+    } catch (error) {
+      toast(error.message);
+    }
+  }
   const wrapper = document.createElement('div');
   wrapper.innerHTML = current.html;
   const attachments = [];
@@ -205,7 +272,7 @@ async function downloadWord() {
       img.src = `cid:${cid}`;
     } catch { /* ҚМЖ сурет жүктелмесе де мәтінмен сақталады. */ }
   }));
-  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:.75cm 1.15cm .75cm 1.15cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.0}h2,h3{text-align:center;font-size:12pt;margin:2pt 0}p{margin:0 0 2pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:2pt;vertical-align:top;line-height:1.0}.meta-table th{width:auto;text-align:left;background:#fff}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table .flow-title th{font-size:12pt}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:13pt}li{margin:0;line-height:1.0}.legal-note{font-size:10pt;text-align:center;margin:1pt 0 3pt}.math-visual{margin:3pt auto;text-align:center;page-break-inside:avoid}.math-visual img{max-width:420px;max-height:150pt;width:100%;height:auto;object-fit:contain}.math-visual figcaption{font-size:10pt;margin-top:1pt}.lesson-task{margin:2pt 0;padding:2pt;border:1px solid #777;page-break-inside:avoid}.task-descriptor{margin:1pt 0;padding:2pt;background:#f1f1f1;border-left:2px solid #333}</style></head><body>${wrapper.innerHTML}</body></html>`;
+  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:.75cm 1.15cm .75cm 1.15cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.0}h2,h3{text-align:center;font-size:12pt;margin:2pt 0}p{margin:0 0 2pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:2pt;vertical-align:top;line-height:1.0}.meta-table th{width:auto;text-align:left;background:#fff}.flow-heading{text-align:center;margin:3pt 0 1pt}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:13pt}li{margin:0;line-height:1.0}.legal-note{font-size:10pt;text-align:center;margin:1pt 0 3pt}.math-visual{margin:3pt auto;text-align:center;page-break-inside:avoid}.math-visual img{max-width:420px;max-height:150pt;width:100%;height:auto;object-fit:contain}.math-visual figcaption{font-size:10pt;margin-top:1pt}.lesson-task{margin:2pt 0;padding:2pt;border:1px solid #777;page-break-inside:avoid}.task-descriptor{margin:1pt 0;padding:2pt;background:#f1f1f1;border-left:2px solid #333}.bbu-table{width:100%;margin-top:3pt;border-collapse:collapse;table-layout:fixed}.bbu-table th,.bbu-table td{width:33.333%!important;border:1px solid #000!important;padding:2pt!important;text-align:center}.bbu-table td{height:18pt}</style></head><body>${wrapper.innerHTML}</body></html>`;
   const boundary = `----=_QMJ_${Date.now()}`;
   const parts = [
     'MIME-Version: 1.0',
