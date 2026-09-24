@@ -101,6 +101,7 @@ function payload() {
     subject: $('#subject').value,
     grade: $('#grade').value,
     term: $('#term').value,
+    track: $('#track').value,
     language: $('#language').value,
     section: $('#section').value.trim(),
     topic: $('#topic').value.trim(),
@@ -255,6 +256,137 @@ async function downloadReferenceWord(topic) {
   URL.revokeObjectURL(link.href);
 }
 
+function xmlEscape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char]));
+}
+
+function wordRun(text, options = {}) {
+  const properties = `${options.bold ? '<w:b/>' : ''}<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="${options.size || 20}"/><w:szCs w:val="${options.size || 20}"/>`;
+  return `<w:r><w:rPr>${properties}</w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
+}
+
+function inlineWordRuns(node, options = {}) {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ? wordRun(node.textContent, options) : '';
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  if (node.tagName === 'BR') return '<w:r><w:br/></w:r>';
+  const next = { ...options, bold: options.bold || ['STRONG', 'B'].includes(node.tagName) };
+  return [...node.childNodes].map(child => inlineWordRuns(child, next)).join('');
+}
+
+function wordParagraph(content, options = {}) {
+  const runs = typeof content === 'string' ? wordRun(content, options) : inlineWordRuns(content, options);
+  const align = options.align ? `<w:jc w:val="${options.align}"/>` : '';
+  const spacing = `<w:spacing w:before="${options.before || 0}" w:after="${options.after ?? 20}" w:line="${options.line || 220}" w:lineRule="auto"/>`;
+  return `<w:p><w:pPr>${align}${spacing}</w:pPr>${runs || wordRun(' ', options)}</w:p>`;
+}
+
+function imageDrawing(asset, relationshipId, drawingId) {
+  const maxWidth = 1965960;
+  const maxHeight = 2011680;
+  const scale = Math.min(maxWidth / asset.width, maxHeight / asset.height);
+  const cx = Math.max(1, Math.round(asset.width * scale));
+  const cy = Math.max(1, Math.round(asset.height * scale));
+  return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="20" w:after="20"/></w:pPr><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${drawingId}" name="ҚМЖ суреті ${drawingId}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${drawingId}" name="image${drawingId}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+
+async function collectWordImages(wrapper) {
+  const assets = new Map();
+  const images = [...wrapper.querySelectorAll('img[src^="/visuals/"], img[src^="/textbook-excerpts/"]')];
+  await Promise.all(images.map(async (img, index) => {
+    try {
+      const response = await fetch(img.getAttribute('src'));
+      if (!response.ok) return;
+      const objectUrl = URL.createObjectURL(await response.blob());
+      try {
+        const source = new Image();
+        await new Promise((resolve, reject) => {
+          source.onload = resolve;
+          source.onerror = reject;
+          source.src = objectUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = Math.max(240, Math.round(1200 * (source.naturalHeight || 520) / (source.naturalWidth || 900)));
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(source, 0, 0, canvas.width, canvas.height);
+        assets.set(img, { base64: canvas.toDataURL('image/png').split(',')[1], width: canvas.width, height: canvas.height, relationshipId: `rIdImage${index + 1}`, fileName: `image${index + 1}.png`, drawingId: index + 1 });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch { /* Сурет болмаса, қалған ҚМЖ Word-қа сақталады. */ }
+  }));
+  return assets;
+}
+
+function elementBlocks(element, context) {
+  if (element.nodeType === Node.TEXT_NODE) {
+    const text = element.textContent.trim();
+    return text ? wordParagraph(text, { size: context.size }) : '';
+  }
+  if (element.nodeType !== Node.ELEMENT_NODE) return '';
+  if (element.tagName === 'P') return wordParagraph(element, { size: context.size, after: 20 });
+  if (element.tagName === 'UL' || element.tagName === 'OL') {
+    return [...element.children].map((item, index) => wordParagraph(`${element.tagName === 'OL' ? `${index + 1}.` : '•'} ${item.textContent.trim()}`, { size: context.size, after: 0 })).join('');
+  }
+  if (element.tagName === 'FIGURE') {
+    const image = element.querySelector(':scope > img');
+    const caption = element.querySelector(':scope > figcaption');
+    const asset = image ? context.assets.get(image) : null;
+    return `${asset ? imageDrawing(asset, asset.relationshipId, asset.drawingId) : ''}${caption?.textContent.trim() ? wordParagraph(caption.textContent.trim(), { size: 18, align: 'center', after: 20 }) : ''}`;
+  }
+  if (element.tagName === 'TABLE') return wordTable(element, context);
+  if (element.tagName === 'BR') return wordParagraph(' ', { size: context.size, after: 0 });
+  return [...element.childNodes].map(child => elementBlocks(child, context)).join('');
+}
+
+function wordTable(table, context) {
+  const isFlow = table.classList.contains('flow-table');
+  const isMeta = table.classList.contains('meta-table');
+  const isBbu = table.classList.contains('bbu-table');
+  const columnCount = table.rows[0]?.cells.length || 1;
+  const widths = isFlow ? [933, 3467, 3743, 1251, 1208] : isMeta ? [3011, 7591] : isBbu ? [1200, 1200, 1200] : Array.from({ length: columnCount }, () => Math.floor(10602 / columnCount));
+  const tableWidth = widths.reduce((sum, width) => sum + width, 0);
+  const grid = widths.map(width => `<w:gridCol w:w="${width}"/>`).join('');
+  const rows = [...table.rows].map((row, rowIndex) => {
+    const header = row.parentElement?.tagName === 'THEAD' || [...row.cells].every(cell => cell.tagName === 'TH');
+    const cells = [...row.cells].map((cell, cellIndex) => {
+      const width = widths[cellIndex] || widths[widths.length - 1];
+      let contents = [...cell.childNodes].map(child => elementBlocks(child, { ...context, size: isFlow || isBbu ? 20 : 24 })).join('');
+      if (!contents) contents = wordParagraph(' ', { size: isFlow || isBbu ? 20 : 24 });
+      if (!contents.endsWith('</w:p>')) contents += '<w:p/>';
+      const align = header && (isFlow || isBbu) ? '<w:jc w:val="center"/>' : '';
+      const boldFallback = header && !cell.children.length ? wordParagraph(cell.textContent.trim(), { size: isFlow || isBbu ? 20 : 24, bold: true, align: isFlow || isBbu ? 'center' : undefined }) : '';
+      if (boldFallback) contents = boldFallback;
+      return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/><w:vAlign w:val="top"/>${align}<w:tcMar><w:top w:w="40" w:type="dxa"/><w:left w:w="55" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="55" w:type="dxa"/></w:tcMar></w:tcPr>${contents}</w:tc>`;
+    }).join('');
+    return `<w:tr><w:trPr>${header ? '<w:tblHeader/>' : ''}</w:trPr>${cells}</w:tr>`;
+  }).join('');
+  return `<w:tbl><w:tblPr><w:tblW w:w="${tableWidth}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders><w:top w:val="single" w:sz="6" w:color="000000"/><w:left w:val="single" w:sz="6" w:color="000000"/><w:bottom w:val="single" w:sz="6" w:color="000000"/><w:right w:val="single" w:sz="6" w:color="000000"/><w:insideH w:val="single" w:sz="6" w:color="000000"/><w:insideV w:val="single" w:sz="6" w:color="000000"/></w:tblBorders></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${rows}</w:tbl>`;
+}
+
+async function buildGeneratedDocx(wrapper) {
+  const assets = await collectWordImages(wrapper);
+  const title = wrapper.querySelector(':scope > h2');
+  const legal = wrapper.querySelector(':scope > .legal-note');
+  const meta = wrapper.querySelector(':scope > .meta-table');
+  const heading = wrapper.querySelector(':scope > .flow-heading');
+  const flow = wrapper.querySelector(':scope > .flow-table');
+  const context = { assets, size: 20 };
+  const body = `${title ? wordParagraph(title, { size: 24, bold: true, align: 'center', after: 20 }) : ''}${legal ? wordParagraph(legal, { size: 18, align: 'center', after: 40 }) : ''}${meta ? wordTable(meta, context) : ''}${heading ? wordParagraph(heading, { size: 22, bold: true, align: 'center', before: 40, after: 20 }) : ''}${flow ? wordTable(flow, context) : ''}`;
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="425" w:right="652" w:bottom="425" w:left="652" w:header="0" w:footer="0" w:gutter="0"/><w:cols w:space="0"/><w:docGrid w:linePitch="240"/></w:sectPr></w:body></w:document>`;
+  const imageRelationships = [...assets.values()].map(asset => `<Relationship Id="${asset.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${asset.fileName}"/>`).join('');
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.file('word/document.xml', documentXml);
+  zip.file('word/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="20" w:line="220" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`);
+  zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imageRelationships}</Relationships>`);
+  for (const asset of assets.values()) zip.file(`word/media/${asset.fileName}`, asset.base64, { base64: true });
+  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', compression: 'DEFLATE' });
+}
+
 async function downloadWord() {
   if (!current.html) return;
   const topic = $('#topic').value.trim() || 'QMJ';
@@ -268,44 +400,11 @@ async function downloadWord() {
   }
   const wrapper = document.createElement('div');
   wrapper.innerHTML = current.html;
-  const attachments = [];
-  await Promise.all([...wrapper.querySelectorAll('img[src^="/visuals/"], img[src^="/textbook-excerpts/"]')].map(async (img, index) => {
-    try {
-      const cid = `qmj-visual-${index + 1}.png`;
-      const base64 = await visualToPngBase64(img.getAttribute('src'));
-      attachments.push({ cid, base64 });
-      img.src = `cid:${cid}`;
-    } catch { /* ҚМЖ сурет жүктелмесе де мәтінмен сақталады. */ }
-  }));
-  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:.75cm 1.15cm .75cm 1.15cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.0}h2,h3{text-align:center;font-size:12pt;margin:2pt 0}p{margin:0 0 2pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:2pt;vertical-align:top;line-height:1.0}.meta-table th{width:auto;text-align:left;background:#fff}.flow-heading{text-align:center;margin:3pt 0 1pt}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:13pt}li{margin:0;line-height:1.0}.legal-note{font-size:10pt;text-align:center;margin:1pt 0 3pt}.math-visual{margin:3pt auto;text-align:center;page-break-inside:avoid}.math-visual img{max-width:420px;max-height:240pt;width:100%;height:auto;object-fit:contain}.math-visual figcaption{font-size:10pt;margin-top:1pt}.lesson-task{margin:2pt 0;padding:2pt;border:1px solid #777;page-break-inside:avoid}.task-descriptor{margin:1pt 0;padding:2pt;background:#f1f1f1;border-left:2px solid #333}.bbu-table{width:100%;margin-top:3pt;border-collapse:collapse;table-layout:fixed}.bbu-table th,.bbu-table td{width:33.333%!important;border:1px solid #000!important;padding:2pt!important;text-align:center}.bbu-table td{height:18pt}</style></head><body>${wrapper.innerHTML}</body></html>`;
-  const boundary = `----=_QMJ_${Date.now()}`;
-  const parts = [
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/related; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset="utf-8"',
-    'Content-Transfer-Encoding: base64',
-    'Content-Location: file:///C:/qmj.html',
-    '',
-    wrapBase64(utf8ToBase64(html))
-  ];
-  for (const attachment of attachments) {
-    parts.push(
-      `--${boundary}`,
-      'Content-Type: image/png',
-      'Content-Transfer-Encoding: base64',
-      `Content-Location: ${attachment.cid}`,
-      `Content-ID: <${attachment.cid}>`,
-      '',
-      wrapBase64(attachment.base64)
-    );
-  }
-  parts.push(`--${boundary}--`, '');
-  const blob = new Blob([parts.join('\r\n')], { type: 'application/msword' });
+  if (!window.JSZip) throw new Error('Word модулі жүктелмеді. Бетті жаңартып көріңіз');
+  const blob = await buildGeneratedDocx(wrapper);
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `ҚМЖ-${topic.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.doc`;
+  link.download = `ҚМЖ-${topic.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.docx`;
   link.click();
   URL.revokeObjectURL(link.href);
 }

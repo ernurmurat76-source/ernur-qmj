@@ -52,6 +52,12 @@ def main() -> int:
         expected_task_counts = [0, 1, 4, 1]
         if [len(stage.get("tasks") or []) for stage in stages] != expected_task_counts:
             errors.append(f'{record.get("id")}: тапсырмалар мен дескрипторлар кезеңдерге дұрыс орналаспаған')
+        middle_tasks = (stages[2].get("tasks") or []) if len(stages) > 2 else []
+        first_middle_instruction = str(middle_tasks[0].get("instruction", "")) if middle_tasks else ""
+        if "Оқулық үзіндісіндегі" not in first_middle_instruction or "жазбаша" not in first_middle_instruction:
+            errors.append(f'{record.get("id")}: негізгі бөлімде оқулық есебін жазбаша орындау тапсырмасы жоқ')
+        if "written_textbook_task" not in (record.get("quality_flags") or []):
+            errors.append(f'{record.get("id")}: жазбаша оқулық тапсырмасы белгіленбеген')
         for stage in stages:
             for task in stage.get("tasks") or []:
                 if not task.get("instruction") or not task.get("descriptor") or int(task.get("points", 0)) < 1:
@@ -105,6 +111,7 @@ def main() -> int:
         "teacher_template_plans": sum(record.get("prepared_plan", {}).get("templateStatus") == "teacher-provided-qmj-structure" for record in new_records),
         "textbook_page_bound": sum(bool(record.get("prepared_plan", {}).get("textbookPageBinding")) for record in new_records),
         "textbook_excerpt_embedded": sum(bool(record.get("prepared_plan", {}).get("visuals")) for record in new_records),
+        "written_textbook_tasks": sum("written_textbook_task" in (record.get("quality_flags") or []) for record in new_records),
         "covered_groups": len(counts),
         "errors": errors,
     }
