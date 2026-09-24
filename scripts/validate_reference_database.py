@@ -34,19 +34,31 @@ def main() -> int:
             errors.append(f'{record.get("id")}: әдістемелік бағыт жоқ')
         plan = record.get("prepared_plan") or {}
         stages = plan.get("stages") or []
-        if len(stages) != 3:
-            errors.append(f'{record.get("id")}: дайын ҚМЖ-ның 3 кезеңі жоқ')
+        if len(stages) != 4:
+            errors.append(f'{record.get("id")}: дайын ҚМЖ-ның 4 кезеңі жоқ')
         if sum(int(stage.get("minutes", 0)) for stage in stages) != 45:
             errors.append(f'{record.get("id")}: дайын ҚМЖ 45 минут емес')
-        for stage in stages:
+        if [int(stage.get("minutes", 0)) for stage in stages] != [5, 10, 25, 5]:
+            errors.append(f'{record.get("id")}: кезеңдер 5–10–25–5 минутқа бөлінбеген')
+        for index, stage in enumerate(stages):
             if not stage.get("teacherActions") or not stage.get("learnerActions"):
                 errors.append(f'{record.get("id")}: кезең әрекеттері толық емес')
-            if not stage.get("descriptors") or any(int(item.get("points", 0)) < 1 for item in stage.get("descriptors", [])):
-                errors.append(f'{record.get("id")}: дескриптор немесе балл толық емес')
-        middle = stages[1] if len(stages) > 1 else {}
-        teacher_text = " ".join(middle.get("teacherActions") or [])
-        if not all(marker in teacher_text for marker in ("1-тапсырма", "2-тапсырма", "3-тапсырма", "4-тапсырма")):
-            errors.append(f'{record.get("id")}: нақты төрт оқу тапсырмасы толық емес')
+            if stage.get("descriptors"):
+                errors.append(f'{record.get("id")}: жалпы кезеңдік дескриптор болмауы тиіс')
+            if index != 2 and stage.get("tasks"):
+                errors.append(f'{record.get("id")}: дескрипторлы тапсырма орта бөлімнен тыс орналасқан')
+        middle = stages[2] if len(stages) > 2 else {}
+        tasks = middle.get("tasks") or []
+        if len(tasks) != 4:
+            errors.append(f'{record.get("id")}: орта бөлімдегі төрт тапсырма толық емес')
+        for task in tasks:
+            if not task.get("instruction") or not task.get("descriptor") or int(task.get("points", 0)) < 1:
+                errors.append(f'{record.get("id")}: тапсырма астындағы дескриптор немесе балл толық емес')
+        if plan.get("assessmentCriteria"):
+            errors.append(f'{record.get("id")}: артық бағалау критерийлері жолы сақталған')
+        binding = plan.get("textbookPageBinding") or {}
+        if binding.get("publisher") != "Атамұра" or not binding.get("file") or int(binding.get("pdfPage", 0)) < 1:
+            errors.append(f'{record.get("id")}: Атамұра оқулығының беті байланыстырылмаған')
         if not plan.get("answerKey"):
             errors.append(f'{record.get("id")}: мұғалімге арналған жауап кілті жоқ')
         if not plan.get("textbookSources"):
@@ -79,7 +91,8 @@ def main() -> int:
         "new_ktz_records": len(new_records),
         "prepared_plans": sum(bool(record.get("prepared_plan")) for record in new_records),
         "atamura_aligned": sum(record.get("textbook_alignment", {}).get("publisher") == "Атамұра" for record in new_records),
-        "plans_with_visuals": sum(bool(record.get("prepared_plan", {}).get("visuals")) for record in new_records),
+        "teacher_template_plans": sum(record.get("prepared_plan", {}).get("templateStatus") == "teacher-provided-qmj-structure" for record in new_records),
+        "textbook_page_bound": sum(bool(record.get("prepared_plan", {}).get("textbookPageBinding")) for record in new_records),
         "covered_groups": len(counts),
         "errors": errors,
     }

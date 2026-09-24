@@ -388,17 +388,26 @@ function normalizePlan(raw, body, reference = null) {
     teacherActions: asList(stage?.teacherActions, fallback.stages[index]?.teacherActions || ['Тапсырманы ұйымдастырады.']),
     learnerActions: asList(stage?.learnerActions, fallback.stages[index]?.learnerActions || ['Тапсырманы орындайды.']),
     descriptors: (Array.isArray(stage?.descriptors) ? stage.descriptors : []).map(item => ({ text: String(item?.text || '').trim(), points: Math.max(1, Math.round(Number(item?.points) || 1)) })).filter(item => item.text),
+    tasks: (Array.isArray(stage?.tasks) ? stage.tasks : []).map((item, taskIndex) => ({
+      number: Math.max(1, Math.round(Number(item?.number) || taskIndex + 1)),
+      instruction: String(item?.instruction || '').trim(),
+      descriptor: String(item?.descriptor || '').trim(),
+      points: Math.max(1, Math.round(Number(item?.points) || 1))
+    })).filter(item => item.instruction && item.descriptor),
+    visuals: (Array.isArray(stage?.visuals) ? stage.visuals : []).map(item => ({
+      src: /^\/visuals\/[a-z0-9-]+\.svg$/i.test(String(item?.src || '')) ? String(item.src) : '',
+      alt: String(item?.alt || 'Математикалық сызба').trim(),
+      caption: String(item?.caption || '').trim()
+    })).filter(item => item.src).slice(0, 2),
     feedback: String(stage?.feedback || 'Дескрипторға сай кері байланыс').trim(),
     resources: asList(stage?.resources, ['Оқулық']),
     support: String(stage?.support || '').trim()
   }));
-  stages.forEach(stage => { if (!stage.descriptors.length) stage.descriptors = [{ text: 'тапсырманы талапқа сай орындайды', points: 1 }]; });
   const total = stages.reduce((sum, stage) => sum + stage.minutes, 0);
   stages[stages.length - 1].minutes = Math.max(1, stages[stages.length - 1].minutes + (45 - total));
   if (stages.reduce((sum, stage) => sum + stage.minutes, 0) !== 45) return fallback;
   return {
     lessonObjectives: asList(raw?.lessonObjectives, fallback.lessonObjectives),
-    assessmentCriteria: asList(raw?.assessmentCriteria, fallback.assessmentCriteria),
     stages,
     differentiation: String(raw?.differentiation || fallback.differentiation).trim(),
     safety: String(raw?.safety || fallback.safety).trim(),
@@ -416,23 +425,16 @@ function normalizePlan(raw, body, reference = null) {
 function renderPlan(body, plan, model, reference = null) {
   const list = items => `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
   const rows = plan.stages.map(stage => {
-    const points = stage.descriptors.reduce((sum, item) => sum + item.points, 0);
-    const teacher = `<p><strong><em>Тәсіл: ${escapeHtml(stage.method)}</em></strong></p><p><strong>${escapeHtml(stage.workForm)}</strong></p>${list(stage.teacherActions)}`;
-    const assessment = `<strong>Дескрипторлар — ${points} балл:</strong>${list(stage.descriptors.map(item => `${item.text} — ${item.points}`))}<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
+    const tasks = stage.name === 'Сабақтың ортасы' ? (stage.tasks || []).map(task => `<div class="lesson-task"><p><strong>${task.number}-тапсырма.</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p></div>`).join('') : '';
+    const visuals = (stage.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
+    const teacher = `<p><strong><em>Тәсіл: ${escapeHtml(stage.method)}</em></strong></p><p><strong>${escapeHtml(stage.workForm)}</strong></p>${list(stage.teacherActions)}${tasks}${visuals}`;
+    const assessment = `<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
     return `<tr><td><strong>${escapeHtml(stage.name)}</strong><br>${stage.minutes} минут</td><td>${teacher}</td><td>${list(stage.learnerActions)}</td><td>${assessment}</td><td>${list(stage.resources)}</td></tr>`;
   }).join('');
-  const visuals = (plan.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
-  const visualSection = visuals ? `<section class="visual-support"><h3>Көрнекі қолдау</h3>${visuals}</section>` : '';
-  const sources = plan.textbookSources?.length ? `<p><strong>Оқулықпен сәйкестік:</strong> ${escapeHtml(plan.textbookSources.join('; '))}</p>` : '';
-  const sourceNote = plan.sourceNote ? `<p><em>${escapeHtml(plan.sourceNote)}</em></p>` : '';
-  const answerKey = plan.answerKey?.length ? `<details class="answer-key"><summary><strong>Мұғалімге арналған қысқа жауап кілті</strong></summary>${list(plan.answerKey)}</details>` : '';
   const valuesRow = reference?.values ? `<tr><th>Құндылықтар</th><td>${escapeHtml(reference.values)}</td></tr>` : '';
-  const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><colgroup><col style="width:28.4%"><col style="width:71.6%"></colgroup><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысқандар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr><tr><th>Бағалау критерийлері <small>(әдістемелік толықтыру)</small></th><td>${list(plan.assessmentCriteria)}</td></tr>${valuesRow}</table><table class="flow-table"><colgroup><col style="width:8.8%"><col style="width:32.7%"><col style="width:35.3%"><col style="width:11.8%"><col style="width:11.4%"></colgroup><thead><tr class="flow-title"><th colspan="5">Сабақ барысы: 45 минут</th></tr><tr><th>Уақыты/кезеңдері</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table><section class="method-notes"><h3>Әдістемелік толықтырулар</h3><p><strong>Саралау және қолдау:</strong> ${escapeHtml(plan.differentiation)}</p><p><strong>Қауіпсіздік:</strong> ${escapeHtml(plan.safety)}</p><p><em>Бағалау критерийлері, дескрипторлар, баллдар, саралау және қауіпсіздік түсіндірмелері — ҚМЖ сапасын күшейтетін әдістемелік толықтырулар.</em></p></section></article>`;
-  const enrichedHtml = html
-    .replace('</tbody></table><section class="method-notes">', `</tbody></table>${visualSection}<section class="method-notes">`)
-    .replace('<p><em>Бағалау критерийлері,', `${sources}${sourceNote}${answerKey}<p><em>Бағалау критерийлері,`);
+  const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><colgroup><col style="width:28.4%"><col style="width:71.6%"></colgroup><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысқандар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr>${valuesRow}</table><table class="flow-table"><colgroup><col style="width:8.8%"><col style="width:32.7%"><col style="width:35.3%"><col style="width:11.8%"><col style="width:11.4%"></colgroup><thead><tr class="flow-title"><th colspan="5">Сабақ барысы: 45 минут</th></tr><tr><th>Уақыты/кезеңдері</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table></article>`;
   const text = `Қысқа мерзімді (сабақ) жоспары\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nОқу мақсаты: ${body.objective}`;
-  return { html: enrichedHtml, text, model, format: 'qmj-130', reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
+  return { html, text, model, format: 'qmj-130', reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
 }
 
 function apiConfig() {

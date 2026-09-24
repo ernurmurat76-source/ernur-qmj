@@ -95,9 +95,11 @@ async function main() {
     const generatedTermTwo = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', term: '2', language: 'Қазақ тілі', section: termTwoLesson.section, topic: termTwoLesson.topic, objective: termTwoLesson.objectives }) });
     assert.equal(generatedTermTwo.status, 200);
     assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
-    assert.ok(generatedTermTwo.data.html.includes('1-тапсырманы үлгімен бастайды'));
-    assert.ok(generatedTermTwo.data.html.includes('Оқулықпен сәйкестік'));
-    assert.ok(generatedTermTwo.data.html.includes('Мұғалімге арналған қысқа жауап кілті'));
+    assert.ok(generatedTermTwo.data.html.includes('1-тапсырма.'));
+    assert.ok(generatedTermTwo.data.html.includes('Атамұра оқулығы'));
+    assert.ok(generatedTermTwo.data.html.includes('Сабақтың ортасы</strong><br>25 минут'));
+    assert.ok(!generatedTermTwo.data.html.includes('Бағалау критерийлері'));
+    assert.equal((generatedTermTwo.data.html.match(/Дескриптор —/g) || []).length, 4);
     assert.equal(generatedTermTwo.data.model, 'Дайын ҚМЖ базасы · ЖИ қолданылмады');
     const blockedSubject = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(blockedSubject.status, 403);
