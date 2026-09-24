@@ -32,6 +32,17 @@ def main() -> int:
             errors.append(f'{record.get("id")}: тақырып жоқ')
         if not record.get("methodological_guidance"):
             errors.append(f'{record.get("id")}: әдістемелік бағыт жоқ')
+        plan = record.get("prepared_plan") or {}
+        stages = plan.get("stages") or []
+        if len(stages) != 3:
+            errors.append(f'{record.get("id")}: дайын ҚМЖ-ның 3 кезеңі жоқ')
+        if sum(int(stage.get("minutes", 0)) for stage in stages) != 45:
+            errors.append(f'{record.get("id")}: дайын ҚМЖ 45 минут емес')
+        for stage in stages:
+            if not stage.get("teacherActions") or not stage.get("learnerActions"):
+                errors.append(f'{record.get("id")}: кезең әрекеттері толық емес')
+            if not stage.get("descriptors") or any(int(item.get("points", 0)) < 1 for item in stage.get("descriptors", [])):
+                errors.append(f'{record.get("id")}: дескриптор немесе балл толық емес')
 
     counts = Counter((record.get("grade"), record.get("subject"), record.get("track", ""), record.get("term")) for record in new_records)
     required = []
@@ -51,6 +62,7 @@ def main() -> int:
     summary = {
         "records": len(records),
         "new_ktz_records": len(new_records),
+        "prepared_plans": sum(bool(record.get("prepared_plan")) for record in new_records),
         "covered_groups": len(counts),
         "errors": errors,
     }

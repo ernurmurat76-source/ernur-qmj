@@ -20,6 +20,15 @@ alter table public.access_codes add column if not exists bound_device_2 text;
 alter table public.access_codes add column if not exists bound_device_1_at timestamptz;
 alter table public.access_codes add column if not exists bound_device_2_at timestamptz;
 alter table public.access_codes add column if not exists device_reset_count bigint not null default 0;
+alter table public.access_codes add column if not exists allowed_subjects text[] not null default array['Математика']::text[];
+
+update public.access_codes
+set allowed_subjects = array['Математика']::text[]
+where allowed_subjects is null or cardinality(allowed_subjects) = 0;
+
+alter table public.access_codes drop constraint if exists access_codes_allowed_subjects_count;
+alter table public.access_codes add constraint access_codes_allowed_subjects_count
+  check (cardinality(allowed_subjects) between 1 and 3);
 
 create index if not exists access_codes_code_idx on public.access_codes (code);
 create index if not exists access_codes_created_at_idx on public.access_codes (created_at desc);

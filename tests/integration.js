@@ -66,11 +66,15 @@ async function main() {
     const login = await request('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'test-password' }) });
     assert.equal(login.status, 200);
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${login.data.token}` };
-    const created = await request('/api/admin/codes', { method: 'POST', headers: auth, body: JSON.stringify({ label: 'Тест мұғалім', days: 45 }) });
+    const tooManySubjects = await request('/api/admin/codes', { method: 'POST', headers: auth, body: JSON.stringify({ label: 'Қате код', days: 45, allowedSubjects: ['Математика', 'Алгебра', 'Геометрия', 'Информатика'] }) });
+    assert.equal(tooManySubjects.status, 400);
+    const created = await request('/api/admin/codes', { method: 'POST', headers: auth, body: JSON.stringify({ label: 'Тест мұғалім', days: 45, allowedSubjects: ['Математика', 'Алгебра', 'Геометрия'] }) });
     assert.equal(created.status, 201);
     assert.match(created.data.code.code, /^ERNUR-[A-Z2-9]{5}-[A-Z2-9]{5}$/);
     const teacherAuth = { 'Content-Type': 'application/json', Authorization: `Bearer ${created.data.code.code}`, 'X-Device-Id': '11111111-1111-4111-8111-111111111111' };
-    assert.equal((await request('/api/access/verify', { method: 'POST', headers: teacherAuth, body: '{}' })).status, 200);
+    const verified = await request('/api/access/verify', { method: 'POST', headers: teacherAuth, body: '{}' });
+    assert.equal(verified.status, 200);
+    assert.deepEqual(verified.data.allowedSubjects, ['Математика', 'Алгебра', 'Геометрия']);
     const secondDeviceAuth = { ...teacherAuth, 'X-Device-Id': '22222222-2222-4222-8222-222222222222' };
     const thirdDeviceAuth = { ...teacherAuth, 'X-Device-Id': '33333333-3333-4333-8333-333333333333' };
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: secondDeviceAuth, body: '{}' })).status, 200);
@@ -91,11 +95,16 @@ async function main() {
     const generatedTermTwo = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', term: '2', language: 'Қазақ тілі', section: termTwoLesson.section, topic: termTwoLesson.topic, objective: termTwoLesson.objectives }) });
     assert.equal(generatedTermTwo.status, 200);
     assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
-    assert.ok(generatedTermTwo.data.html.includes('Үлгі–алгоритм–қолдану'));
+    assert.ok(generatedTermTwo.data.html.includes('Үлгіні талдау, басқарылатын жаттығу және дербес қолдану'));
+    assert.equal(generatedTermTwo.data.model, 'Дайын ҚМЖ базасы · ЖИ қолданылмады');
+    const blockedSubject = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
+    assert.equal(blockedSubject.status, 403);
+    const id = created.data.code.id;
+    const subjectsUpdated = await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'subjects', allowedSubjects: ['Математика', 'Қазақстан тарихы'] }) });
+    assert.equal(subjectsUpdated.status, 200);
     const generated = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(generated.status, 200);
     assert.ok(generated.data.html.includes('45 минут'));
-    const id = created.data.code.id;
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'toggle', isActive: false }) })).status, 200);
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: teacherAuth, body: '{}' })).status, 401);
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'toggle', isActive: true }) })).status, 200);
@@ -108,7 +117,7 @@ async function main() {
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: thirdDeviceAuth, body: '{}' })).status, 200);
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'DELETE', headers: auth })).status, 200);
     assert.equal((await request('/api/admin/codes', { headers: auth })).data.codes.length, 0);
-    console.log('Admin CRUD, two-device access control, 1439-reference four-term database and 45-minute QMJ: OK');
+    console.log('Admin CRUD, 1-3 subject permissions, two-device access control, 1439-reference database and 1164 prepared no-AI plans: OK');
   } finally {
     app.kill();
     database.close();

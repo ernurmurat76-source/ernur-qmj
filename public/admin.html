@@ -28,7 +28,7 @@
     </section>
 
     <section class="admin-dashboard hidden" id="dashboard">
-      <div class="dashboard-title"><div><span class="admin-label">Ernur QMJ</span><h1>Кодтарды басқару</h1><p>Әр код ең көбі екі құрылғыда жұмыс істейді.</p></div><button id="logoutButton" type="button">Шығу</button></div>
+      <div class="dashboard-title"><div><span class="admin-label">Ernur QMJ</span><h1>Кодтарды басқару</h1><p>Әр код ең көбі екі құрылғыда және әкімші таңдаған 1–3 пәнде жұмыс істейді.</p></div><button id="logoutButton" type="button">Шығу</button></div>
       <div class="stats-grid">
         <article><span>Барлық код</span><strong id="totalCount">0</strong></article>
         <article><span>Белсенді</span><strong id="activeCount">0</strong></article>
@@ -42,6 +42,7 @@
             <label>Мұғалімнің аты немесе белгі<input id="codeLabel" maxlength="100" placeholder="Мысалы: Айгүл апай"></label>
             <label>Мерзімі (күн) *<input id="durationDays" type="number" min="1" max="365" step="1" value="45" required></label>
             <div class="quick-days" aria-label="Жылдам мерзім таңдау"><button type="button" data-days="1">1 күн</button><button type="button" data-days="45">45 күн</button><button type="button" data-days="100">100 күн</button><button type="button" data-days="365">365 күн</button></div>
+            <fieldset class="subject-picker"><legend>Рұқсат етілетін пәндер (1–3) *</legend><div id="createSubjects" class="subject-checks"></div><small>Бір кодқа ең көбі 3 пән таңдауға болады.</small></fieldset>
             <p class="error" id="createError"></p>
             <button class="generate" id="createCodeButton" type="submit">Жаңа код жасау</button>
           </form>
@@ -56,6 +57,15 @@
       </div>
     </section>
   </main>
+  <dialog id="subjectsDialog" class="subject-dialog">
+    <form method="dialog" id="subjectsForm">
+      <div class="dialog-heading"><div><span class="admin-label">Код рұқсаты</span><h2>Пәндерді өзгерту</h2></div><button value="cancel" aria-label="Жабу">×</button></div>
+      <p id="subjectsCodeLabel"></p>
+      <div id="editSubjects" class="subject-checks"></div>
+      <p class="error" id="subjectsError"></p>
+      <div class="dialog-actions"><button value="cancel" type="button" id="cancelSubjects">Бас тарту</button><button class="generate" type="submit">Сақтау</button></div>
+    </form>
+  </dialog>
   <div class="toast hidden" id="toast"></div>
   <script src="/admin.js" defer></script>
 </body>

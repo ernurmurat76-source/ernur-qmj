@@ -6,14 +6,21 @@ const ACCESS_STORAGE_KEY = 'ernur-qmj-access-code';
 const DEVICE_STORAGE_KEY = 'ernur-qmj-device-id';
 let accessCode = localStorage.getItem(ACCESS_STORAGE_KEY) || '';
 let deviceId = localStorage.getItem(DEVICE_STORAGE_KEY) || '';
+let allSubjects = [];
+let activeAllowedSubjects = [];
 if (!deviceId) {
   deviceId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Array.from(crypto.getRandomValues(new Uint32Array(4))).map(value => value.toString(16)).join('')}`;
   localStorage.setItem(DEVICE_STORAGE_KEY, deviceId);
 }
 
 async function loadSubjects() {
-  const subjects = await fetch('/subjects.json').then(response => response.json());
-  subjects.forEach(subject => $('#subject').insertAdjacentHTML('beforeend', `<option value="${subject}">${subject}</option>`));
+  allSubjects = await fetch('/subjects.json').then(response => response.json());
+  renderAllowedSubjects(activeAllowedSubjects.length ? activeAllowedSubjects : allSubjects);
+}
+
+function renderAllowedSubjects(subjects) {
+  const valid = allSubjects.filter(subject => subjects.includes(subject));
+  $('#subject').innerHTML = '<option value="">Пәнді таңдаңыз</option>' + valid.map(subject => `<option value="${subject}">${subject}</option>`).join('');
 }
 
 for (let grade = 1; grade <= 11; grade += 1) $('#grade').insertAdjacentHTML('beforeend', `<option value="${grade}-сынып">${grade}-сынып</option>`);
@@ -38,13 +45,15 @@ function lockBuilder(message = '') {
   $('#accessError').textContent = message;
 }
 
-function unlockBuilder(code, expiresAt) {
+function unlockBuilder(code, expiresAt, allowedSubjects = []) {
   accessCode = code;
+  activeAllowedSubjects = allowedSubjects;
   localStorage.setItem(ACCESS_STORAGE_KEY, code);
   $('#accessGate').classList.add('hidden');
   $('#accessStatus').classList.remove('hidden');
   $('#builderLayout').classList.remove('hidden');
-  $('#accessExpiry').textContent = `${formatExpiry(expiresAt)} дейін жарамды`;
+  if (allSubjects.length) renderAllowedSubjects(activeAllowedSubjects);
+  $('#accessExpiry').textContent = `${formatExpiry(expiresAt)} дейін жарамды · Пәндер: ${activeAllowedSubjects.join(', ')}`;
 }
 
 async function verifyCode(code) {
@@ -67,7 +76,7 @@ async function enterWithCode(event) {
   button.textContent = 'Тексеріліп жатыр...';
   try {
     const result = await verifyCode(code);
-    unlockBuilder(code, result.expiresAt);
+    unlockBuilder(code, result.expiresAt, result.allowedSubjects || []);
     toast('Код қабылданды');
   } catch (error) {
     lockBuilder(error.message);
@@ -81,7 +90,7 @@ async function restoreAccess() {
   if (!accessCode) return lockBuilder();
   try {
     const result = await verifyCode(accessCode);
-    unlockBuilder(accessCode, result.expiresAt);
+    unlockBuilder(accessCode, result.expiresAt, result.allowedSubjects || []);
   } catch (error) {
     lockBuilder(error.message);
   }

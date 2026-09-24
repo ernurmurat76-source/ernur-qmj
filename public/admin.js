@@ -4,6 +4,21 @@ const $ = selector => document.querySelector(selector);
 const SESSION_KEY = 'ernur-qmj-admin-session';
 let adminToken = sessionStorage.getItem(SESSION_KEY) || '';
 let codes = [];
+let editingCodeId = '';
+const SUBJECTS = ['Қазақ тілі', 'Қазақ әдебиеті', 'Орыс тілі', 'Орыс әдебиеті', 'Ағылшын тілі', 'Математика', 'Алгебра', 'Геометрия', 'Информатика', 'Қазақстан тарихы', 'Дүниежүзі тарихы', 'География', 'Дене шынықтыру'];
+
+function subjectOptions(selected = ['Математика'], group = 'subject') {
+  return SUBJECTS.map((subject, index) => `<label class="subject-check"><input type="checkbox" name="${group}" value="${escapeHtml(subject)}" ${selected.includes(subject) ? 'checked' : ''}><span>${escapeHtml(subject)}</span></label>`).join('');
+}
+
+function selectedSubjects(container) {
+  return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
+}
+
+function enforceSubjectLimit(container) {
+  const checked = selectedSubjects(container);
+  container.querySelectorAll('input[type="checkbox"]:not(:checked)').forEach(input => { input.disabled = checked.length >= 3; });
+}
 
 function toast(message) {
   $('#toast').textContent = message;
@@ -69,12 +84,13 @@ function renderCodes() {
     const status = statusOf(item);
     const days = remainingDays(item.expires_at);
     const deviceCount = Number(Boolean(item.bound_device_1)) + Number(Boolean(item.bound_device_2));
+    const subjectList = Array.isArray(item.allowed_subjects) ? item.allowed_subjects : ['Математика'];
     return `<tr>
-      <td><strong>${escapeHtml(item.label || 'Атаусыз мұғалім')}</strong><code>${escapeHtml(item.code)}</code><button class="mini-copy" data-copy="${escapeHtml(item.code)}">Көшіру</button></td>
+      <td><strong>${escapeHtml(item.label || 'Атаусыз мұғалім')}</strong><code>${escapeHtml(item.code)}</code><button class="mini-copy" data-copy="${escapeHtml(item.code)}">Көшіру</button><div class="subject-tags">${subjectList.map(subject => `<span>${escapeHtml(subject)}</span>`).join('')}</div></td>
       <td><span class="code-status ${status.key}">${status.text}</span></td>
       <td><strong>${days} күн қалды</strong><small>${formatDate(item.expires_at)}</small></td>
       <td><strong>${Number(item.usage_count || 0)} рет</strong><small>${formatDate(item.last_used_at)}</small><small>Құрылғы: ${deviceCount}/2</small></td>
-      <td><div class="row-actions"><button data-action="extend" data-id="${item.id}">Ұзарту</button><button data-action="toggle" data-active="${!item.is_active}" data-id="${item.id}">${item.is_active ? 'Тоқтату' : 'Қосу'}</button>${deviceCount ? `<button data-action="reset_device" data-id="${item.id}">Құрылғыларды босату</button>` : ''}<button class="danger" data-action="delete" data-id="${item.id}">Жою</button></div></td>
+      <td><div class="row-actions"><button data-action="subjects" data-id="${item.id}">Пәндерді өзгерту</button><button data-action="extend" data-id="${item.id}">Ұзарту</button><button data-action="toggle" data-active="${!item.is_active}" data-id="${item.id}">${item.is_active ? 'Тоқтату' : 'Қосу'}</button>${deviceCount ? `<button data-action="reset_device" data-id="${item.id}">Құрылғыларды босату</button>` : ''}<button class="danger" data-action="delete" data-id="${item.id}">Жою</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -108,6 +124,9 @@ $('#loginForm').addEventListener('submit', async event => {
 });
 
 document.querySelectorAll('[data-days]').forEach(button => button.addEventListener('click', () => { $('#durationDays').value = button.dataset.days; }));
+$('#createSubjects').innerHTML = subjectOptions(['Математика'], 'create-subject');
+$('#createSubjects').addEventListener('change', () => enforceSubjectLimit($('#createSubjects')));
+enforceSubjectLimit($('#createSubjects'));
 
 $('#createCodeForm').addEventListener('submit', async event => {
   event.preventDefault();
@@ -116,14 +135,18 @@ $('#createCodeForm').addEventListener('submit', async event => {
   $('#createError').textContent = '';
   $('#createdCode').classList.add('hidden');
   if (!Number.isInteger(days) || days < 1 || days > 365) return void ($('#createError').textContent = '1 мен 365 аралығындағы толық күн санын енгізіңіз');
+  const allowedSubjects = selectedSubjects($('#createSubjects'));
+  if (allowedSubjects.length < 1 || allowedSubjects.length > 3) return void ($('#createError').textContent = 'Кодқа 1–3 пән таңдаңыз');
   button.disabled = true;
   button.textContent = 'Жасалып жатыр...';
   try {
-    const data = await api('/api/admin/codes', { method: 'POST', body: JSON.stringify({ label: $('#codeLabel').value, days }) });
+    const data = await api('/api/admin/codes', { method: 'POST', body: JSON.stringify({ label: $('#codeLabel').value, days, allowedSubjects }) });
     $('#codeValue').textContent = data.code.code;
     $('#codeExpiry').textContent = `${days} күнге берілді. ${formatDate(data.code.expires_at)} дейін жарамды.`;
     $('#createdCode').classList.remove('hidden');
     $('#codeLabel').value = '';
+    $('#createSubjects').innerHTML = subjectOptions(['Математика'], 'create-subject');
+    enforceSubjectLimit($('#createSubjects'));
     await loadCodes();
     toast('Жаңа код дайын');
   } catch (error) { $('#createError').textContent = error.message; }
@@ -154,9 +177,32 @@ $('#codesBody').addEventListener('click', async event => {
       if (!confirm('Осы кодқа байланысқан екі құрылғыны босатасыз ба?')) return;
       await api(`/api/admin/codes/${item.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reset_device' }) });
       toast('Құрылғылар босатылды');
+    } else if (button.dataset.action === 'subjects') {
+      editingCodeId = item.id;
+      $('#subjectsCodeLabel').textContent = `${item.label || 'Атаусыз мұғалім'} · ${item.code}`;
+      $('#editSubjects').innerHTML = subjectOptions(Array.isArray(item.allowed_subjects) ? item.allowed_subjects : ['Математика'], 'edit-subject');
+      enforceSubjectLimit($('#editSubjects'));
+      $('#subjectsError').textContent = '';
+      $('#subjectsDialog').showModal();
+      return;
     }
     await loadCodes();
   } catch (error) { toast(error.message); }
+});
+
+$('#editSubjects').addEventListener('change', () => enforceSubjectLimit($('#editSubjects')));
+$('#cancelSubjects').addEventListener('click', () => $('#subjectsDialog').close());
+$('#subjectsForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const allowedSubjects = selectedSubjects($('#editSubjects'));
+  $('#subjectsError').textContent = '';
+  if (allowedSubjects.length < 1 || allowedSubjects.length > 3) return void ($('#subjectsError').textContent = '1–3 пән таңдаңыз');
+  try {
+    await api(`/api/admin/codes/${editingCodeId}`, { method: 'PATCH', body: JSON.stringify({ action: 'subjects', allowedSubjects }) });
+    $('#subjectsDialog').close();
+    await loadCodes();
+    toast('Кодтың пәндері жаңартылды');
+  } catch (error) { $('#subjectsError').textContent = error.message; }
 });
 
 $('#copyCodeButton').addEventListener('click', async () => { await navigator.clipboard.writeText($('#codeValue').textContent); toast('Код көшірілді'); });

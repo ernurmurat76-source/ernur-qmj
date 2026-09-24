@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const REFERENCE_PATH = path.join(__dirname, 'data', 'qmj-reference-index.json');
+const SUBJECTS = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'subjects.json'), 'utf8'));
 const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openrouter').toLowerCase();
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
@@ -97,7 +98,7 @@ async function verifyAccessCode(code, trackUsage = false, deviceId = '') {
   const fingerprint = deviceFingerprint(deviceId);
   if (!fingerprint) return { ok: false, status: 400, error: 'Құрылғы белгісі табылмады. Бетті жаңартып көріңіз' };
   if (!/^ERNUR-[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(normalized)) return { ok: false, status: 401, error: 'Кіру коды қате' };
-  const select = 'id,code,duration_days,expires_at,is_active,usage_count,bound_device_1,bound_device_2,bound_device_1_at,bound_device_2_at';
+  const select = 'id,code,duration_days,expires_at,is_active,usage_count,allowed_subjects,bound_device_1,bound_device_2,bound_device_1_at,bound_device_2_at';
   const rows = await dbRequest(`access_codes?code=eq.${encodeURIComponent(normalized)}&select=${select}&limit=1`);
   let record = rows?.[0];
   if (!record) return { ok: false, status: 401, error: 'Кіру коды қате' };
@@ -134,6 +135,15 @@ async function verifyAccessCode(code, trackUsage = false, deviceId = '') {
     }).catch(error => console.error('Код статистикасы жаңармады:', error.message));
   }
   return { ok: true, record };
+}
+
+function normalizeAllowedSubjects(value) {
+  const input = Array.isArray(value) ? value : [];
+  return [...new Set(input.map(item => String(item || '').trim()).filter(item => SUBJECTS.includes(item)))];
+}
+
+function codeAllowsSubject(record, subject) {
+  return normalizeAllowedSubjects(record?.allowed_subjects).includes(String(subject || '').trim());
 }
 
 function requestAccessCode(req, body = {}) {
@@ -260,6 +270,7 @@ function distributeMinutes(stages) {
 
 function planFromReference(reference, body) {
   if (!reference) return demoPlan(body);
+  if (reference.prepared_plan) return normalizePlan(reference.prepared_plan, body, null);
   let usable = reference.stages.filter(stage => stage.teacher || stage.learner).slice(0, 6);
   if (!usable.length) return curriculumPlan(body, reference);
   const minutes = distributeMinutes(usable);
@@ -415,6 +426,7 @@ function apiConfig() {
 
 async function generatePlan(body) {
   const reference = selectReference(body);
+  if (reference?.prepared_plan) return renderPlan(body, planFromReference(reference, body), 'Дайын ҚМЖ базасы · ЖИ қолданылмады', reference);
   if (reference?.stages?.length) return renderPlan(body, planFromReference(reference, body), 'Дайын ҚМЖ', reference);
   const config = apiConfig();
   if (!config.key) return renderPlan(body, planFromReference(reference, body), reference ? 'ҚМЖ базасы' : 'demo-template', reference);
@@ -446,13 +458,14 @@ async function handleApi(req, res, pathname) {
       const grade = url.searchParams.get('grade') || '';
       const subject = url.searchParams.get('subject') || '';
       const term = Number(url.searchParams.get('term') || 0);
+      if (!codeAllowsSubject(access.record, subject)) return sendJson(res, 403, { error: `Бұл код «${subject}» пәніне рұқсат бермейді`, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
       return sendJson(res, 200, { scope: referenceDatabase.source_scope, references: referenceSummaries(grade, subject, term) });
     }
     if (req.method === 'POST' && pathname === '/api/access/verify') {
       const body = await readJson(req);
       const result = await verifyAccessCode(requestAccessCode(req, body), false, requestDeviceId(req));
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
-      return sendJson(res, 200, { ok: true, expiresAt: result.record.expires_at, days: result.record.duration_days });
+      return sendJson(res, 200, { ok: true, expiresAt: result.record.expires_at, days: result.record.duration_days, allowedSubjects: normalizeAllowedSubjects(result.record.allowed_subjects) });
     }
     if (req.method === 'POST' && pathname === '/api/admin/login') {
       if (!ADMIN_PASSWORD || !ACCESS_CODE_SECRET || !databaseReady()) return sendJson(res, 503, { error: 'Әкімші жүйесінің Environment айнымалылары толық орнатылмаған' });
@@ -468,18 +481,20 @@ async function handleApi(req, res, pathname) {
     if (pathname.startsWith('/api/admin/codes')) {
       if (!verifyAdminSession(requestBearer(req))) return sendJson(res, 401, { error: 'Әкімші сессиясы аяқталған. Қайта кіріңіз' });
       if (req.method === 'GET' && pathname === '/api/admin/codes') {
-        const rows = await dbRequest('access_codes?select=id,code,label,duration_days,created_at,expires_at,is_active,last_used_at,usage_count,bound_device_1,bound_device_2,bound_device_1_at,bound_device_2_at,device_reset_count&order=created_at.desc');
+        const rows = await dbRequest('access_codes?select=id,code,label,duration_days,created_at,expires_at,is_active,last_used_at,usage_count,allowed_subjects,bound_device_1,bound_device_2,bound_device_1_at,bound_device_2_at,device_reset_count&order=created_at.desc');
         return sendJson(res, 200, { codes: rows || [] });
       }
       if (req.method === 'POST' && pathname === '/api/admin/codes') {
         const body = await readJson(req);
         const days = Number(body.days);
         if (!Number.isInteger(days) || days < 1 || days > 365) return sendJson(res, 400, { error: 'Мерзім 1–365 күн аралығында болуы керек' });
+        const allowedSubjects = normalizeAllowedSubjects(body.allowedSubjects);
+        if (allowedSubjects.length < 1 || allowedSubjects.length > 3) return sendJson(res, 400, { error: 'Кодқа 1–3 пән таңдаңыз' });
         const code = createAccessCode();
         const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
         const rows = await dbRequest('access_codes', {
           method: 'POST', headers: { Prefer: 'return=representation' },
-          body: JSON.stringify({ code, label: String(body.label || '').trim().slice(0, 100), duration_days: days, expires_at: expiresAt })
+          body: JSON.stringify({ code, label: String(body.label || '').trim().slice(0, 100), duration_days: days, expires_at: expiresAt, allowed_subjects: allowedSubjects })
         });
         return sendJson(res, 201, { code: rows[0] });
       }
@@ -494,6 +509,11 @@ async function handleApi(req, res, pathname) {
         const body = await readJson(req);
         let updates;
         if (body.action === 'toggle') updates = { is_active: Boolean(body.isActive) };
+        else if (body.action === 'subjects') {
+          const allowedSubjects = normalizeAllowedSubjects(body.allowedSubjects);
+          if (allowedSubjects.length < 1 || allowedSubjects.length > 3) return sendJson(res, 400, { error: 'Кодқа 1–3 пән таңдаңыз' });
+          updates = { allowed_subjects: allowedSubjects };
+        }
         else if (body.action === 'reset_device') {
           const rows = await dbRequest(`access_codes?id=eq.${id}&select=device_reset_count&limit=1`);
           if (!rows?.[0]) return sendJson(res, 404, { error: 'Код табылмады' });
@@ -517,6 +537,7 @@ async function handleApi(req, res, pathname) {
       if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
       const required = ['subject', 'grade', 'term', 'language', 'section', 'topic', 'objective'];
       if (required.some(key => !String(body[key] || '').trim())) return sendJson(res, 400, { error: 'Пән, сынып, тоқсан, тіл, бөлім, тақырып және нақты оқу мақсатын толтырыңыз' });
+      if (!codeAllowsSubject(access.record, body.subject)) return sendJson(res, 403, { error: `Бұл код «${body.subject}» пәніне рұқсат бермейді`, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
       return sendJson(res, 200, await generatePlan(body));
     }
     return sendJson(res, 404, { error: 'API жолы табылмады' });
