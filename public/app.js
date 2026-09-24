@@ -149,20 +149,88 @@ async function copyPlan() {
   toast('ҚМЖ мәтіні көшірілді');
 }
 
+function utf8ToBase64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function wrapBase64(value) {
+  return value.match(/.{1,76}/g)?.join('\r\n') || '';
+}
+
+async function visualToPngBase64(src) {
+  const response = await fetch(src);
+  if (!response.ok) throw new Error('Сызба жүктелмеді');
+  const svg = await response.text();
+  const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+  try {
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('Сызба өңделмеді'));
+      image.src = objectUrl;
+    });
+    const sourceWidth = image.naturalWidth || 900;
+    const sourceHeight = image.naturalHeight || 520;
+    const width = 1200;
+    const height = Math.max(240, Math.round(width * sourceHeight / sourceWidth));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL('image/png').split(',')[1];
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function downloadWord() {
   if (!current.html) return;
   const topic = $('#topic').value.trim() || 'QMJ';
   const wrapper = document.createElement('div');
   wrapper.innerHTML = current.html;
-  await Promise.all([...wrapper.querySelectorAll('img[src^="/visuals/"]')].map(async img => {
+  const attachments = [];
+  await Promise.all([...wrapper.querySelectorAll('img[src^="/visuals/"]')].map(async (img, index) => {
     try {
-      const response = await fetch(img.getAttribute('src'));
-      const svg = await response.text();
-      img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+      const cid = `qmj-visual-${index + 1}.png`;
+      const base64 = await visualToPngBase64(img.getAttribute('src'));
+      attachments.push({ cid, base64 });
+      img.src = `cid:${cid}`;
     } catch { /* ҚМЖ сурет жүктелмесе де мәтінмен сақталады. */ }
   }));
   const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:1cm 1.5cm 1cm 1.25cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15}h2,h3{text-align:center;font-size:12pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:4px;vertical-align:top}.meta-table th{width:auto;text-align:left;background:#fff}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table .flow-title th{font-size:12pt}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:16px}.legal-note{font-size:10pt;text-align:center}.math-visual{text-align:center;page-break-inside:avoid}.math-visual img{max-width:520px;width:100%;height:auto}.math-visual figcaption{font-size:10pt}.lesson-task{margin:8px 0;padding:6px;border:1px solid #777;page-break-inside:avoid}.task-descriptor{margin:4px 0;padding:5px;background:#f1f1f1;border-left:3px solid #333}</style></head><body>${wrapper.innerHTML}</body></html>`;
-  const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+  const boundary = `----=_QMJ_${Date.now()}`;
+  const parts = [
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/related; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="utf-8"',
+    'Content-Transfer-Encoding: base64',
+    'Content-Location: file:///C:/qmj.html',
+    '',
+    wrapBase64(utf8ToBase64(html))
+  ];
+  for (const attachment of attachments) {
+    parts.push(
+      `--${boundary}`,
+      'Content-Type: image/png',
+      'Content-Transfer-Encoding: base64',
+      `Content-Location: ${attachment.cid}`,
+      `Content-ID: <${attachment.cid}>`,
+      '',
+      wrapBase64(attachment.base64)
+    );
+  }
+  parts.push(`--${boundary}--`, '');
+  const blob = new Blob([parts.join('\r\n')], { type: 'application/msword' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `ҚМЖ-${topic.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.doc`;

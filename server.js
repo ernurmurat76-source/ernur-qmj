@@ -284,7 +284,7 @@ function planFromReference(reference, body) {
       workForm: beginning ? 'Бүкіл сыныппен жұмыс' : ending ? 'Жеке жұмыс' : 'Жеке және жұптық жұмыс',
       teacherActions: splitText(stage.teacher, ['Тапсырманы түсіндіреді және орындалуын бақылайды.']),
       learnerActions: splitText(stage.learner, ['Берілген тапсырманы орындайды және нәтижесін түсіндіреді.']),
-      descriptors: [{ text: ending ? 'өз нәтижесіне қысқа қорытынды жасайды' : 'тапсырманы берілген шартқа сай орындайды', points: 1 }],
+      descriptors: [],
       feedback: splitText(stage.assessment, ['Дескрипторға сай ауызша кері байланыс']).join(' '),
       resources: splitText(stage.resources, ['Оқулық', 'Тапсырма парағы']).slice(0, 5),
       support: 'Қажет оқушыға үлгі, тірек сөз немесе кезеңдік нұсқаулық беріледі.'
@@ -425,10 +425,11 @@ function normalizePlan(raw, body, reference = null) {
 function renderPlan(body, plan, model, reference = null) {
   const list = items => `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
   const rows = plan.stages.map(stage => {
-    const tasks = stage.name === 'Сабақтың ортасы' ? (stage.tasks || []).map(task => `<div class="lesson-task"><p><strong>${task.number}-тапсырма.</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p></div>`).join('') : '';
+    const tasks = (stage.tasks || []).map(task => `<div class="lesson-task"><p><strong>${task.number}-тапсырма.</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p></div>`).join('');
     const visuals = (stage.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
-    const teacher = `<p><strong><em>Тәсіл: ${escapeHtml(stage.method)}</em></strong></p><p><strong>${escapeHtml(stage.workForm)}</strong></p>${list(stage.teacherActions)}${tasks}${visuals}`;
-    const assessment = `<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
+    const teacher = `${list(stage.teacherActions)}${tasks}${visuals}`;
+    const stageDescriptors = (stage.descriptors || []).length ? `<p><strong>Дескриптор:</strong></p>${list(stage.descriptors.map(item => `${item.text} — ${item.points} балл`))}` : '';
+    const assessment = `${stageDescriptors}<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
     return `<tr><td><strong>${escapeHtml(stage.name)}</strong><br>${stage.minutes} минут</td><td>${teacher}</td><td>${list(stage.learnerActions)}</td><td>${assessment}</td><td>${list(stage.resources)}</td></tr>`;
   }).join('');
   const valuesRow = reference?.values ? `<tr><th>Құндылықтар</th><td>${escapeHtml(reference.values)}</td></tr>` : '';

@@ -45,17 +45,21 @@ def main() -> int:
                 errors.append(f'{record.get("id")}: кезең әрекеттері толық емес')
             if stage.get("descriptors"):
                 errors.append(f'{record.get("id")}: жалпы кезеңдік дескриптор болмауы тиіс')
-            if index != 2 and stage.get("tasks"):
-                errors.append(f'{record.get("id")}: дескрипторлы тапсырма орта бөлімнен тыс орналасқан')
-        middle = stages[2] if len(stages) > 2 else {}
-        tasks = middle.get("tasks") or []
-        if len(tasks) != 4:
-            errors.append(f'{record.get("id")}: орта бөлімдегі төрт тапсырма толық емес')
-        for task in tasks:
-            if not task.get("instruction") or not task.get("descriptor") or int(task.get("points", 0)) < 1:
-                errors.append(f'{record.get("id")}: тапсырма астындағы дескриптор немесе балл толық емес')
+            if any("бағдарлық PDF беті" in str(item) for item in stage.get("resources", [])):
+                errors.append(f'{record.get("id")}: ресурстарда артық оқулық беті көрсетілген')
+        expected_task_counts = [0, 1, 4, 1]
+        if [len(stage.get("tasks") or []) for stage in stages] != expected_task_counts:
+            errors.append(f'{record.get("id")}: тапсырмалар мен дескрипторлар кезеңдерге дұрыс орналаспаған')
+        for stage in stages:
+            for task in stage.get("tasks") or []:
+                if not task.get("instruction") or not task.get("descriptor") or int(task.get("points", 0)) < 1:
+                    errors.append(f'{record.get("id")}: тапсырма астындағы дескриптор немесе балл толық емес')
+                if "бағдарлық PDF беті" in str(task.get("instruction", "")):
+                    errors.append(f'{record.get("id")}: тапсырмада артық оқулық беті көрсетілген')
         if plan.get("assessmentCriteria"):
             errors.append(f'{record.get("id")}: артық бағалау критерийлері жолы сақталған')
+        if "КТЖ-да берілген оқу мақсатына сәйкес" in " ".join(plan.get("lessonObjectives") or []):
+            errors.append(f'{record.get("id")}: сабақ мақсатында артық КТЖ мәтіні сақталған')
         binding = plan.get("textbookPageBinding") or {}
         if binding.get("publisher") != "Атамұра" or not binding.get("file") or int(binding.get("pdfPage", 0)) < 1:
             errors.append(f'{record.get("id")}: Атамұра оқулығының беті байланыстырылмаған')

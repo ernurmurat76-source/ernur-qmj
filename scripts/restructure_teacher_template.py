@@ -57,6 +57,17 @@ def strip_task_prefix(value: str) -> str:
     return re.sub(r"^\d+-тапсырм[^:]*:\s*", "", str(value or "")).strip()
 
 
+def lesson_objective_text(value: str) -> str:
+    text = re.sub(r"\b\d+(?:\.\d+){2,}\s*", "", str(value or ""))
+    text = re.sub(r"\s*\n\s*", " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" ;.")
+    return text[:1].upper() + text[1:] + "." if text else "Сабақ тапсырмаларын орындайды."
+
+
+def task_text(value: str, prefix: str) -> str:
+    return str(value or "").removeprefix(prefix).strip()
+
+
 def main() -> int:
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "data/qmj-reference-index.json")
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -82,27 +93,36 @@ def main() -> int:
             middle_actions = old[1].get("teacherActions") or []
             while len(middle_actions) < 4:
                 middle_actions.append("Оқу мақсатына сәйкес тақырыптық есепті орында.")
-            source = (
-                f"Атамұра оқулығы: «{book}»; бөлім ретімен белгіленген "
-                f"бағдарлық PDF беті — {pdf_page}"
-            )
             tasks = [
-                {"number": 1, "instruction": f"{source}. {strip_task_prefix(middle_actions[0])}", "descriptor": "есептің берілгендері мен ізделіндісін анықтайды және алғашқы қадамды түсіндіреді", "points": 1},
-                {"number": 2, "instruction": f"{source}. {strip_task_prefix(middle_actions[1])}", "descriptor": "тақырыпқа сәйкес қасиет, формула немесе алгоритмді дұрыс қолданып, жауабын тексереді", "points": 2},
-                {"number": 3, "instruction": f"{source}. {strip_task_prefix(middle_actions[2])}", "descriptor": "мәтіндік есептің моделін құрып, шешу жолы мен жауабының мағынасын түсіндіреді", "points": 2},
+                {"number": 1, "instruction": strip_task_prefix(middle_actions[0]), "descriptor": "есептің берілгендері мен ізделіндісін анықтайды және алғашқы қадамды түсіндіреді", "points": 1},
+                {"number": 2, "instruction": strip_task_prefix(middle_actions[1]), "descriptor": "тақырыпқа сәйкес қасиет, формула немесе алгоритмді дұрыс қолданып, жауабын тексереді", "points": 2},
+                {"number": 3, "instruction": strip_task_prefix(middle_actions[2]), "descriptor": "мәтіндік есептің моделін құрып, шешу жолы мен жауабының мағынасын түсіндіреді", "points": 2},
                 {"number": 4, "instruction": strip_task_prefix(middle_actions[3]), "descriptor": "қатенің орнын және себебін анықтап, дұрыс шешімді жазады", "points": 1},
             ]
             plan.pop("assessmentCriteria", None)
+            beginning_task = task_text(
+                (old[0].get("teacherActions") or [""])[0],
+                "Алдыңғы білімді белсендіретін сұрақ береді: ",
+            )
+            ending_task = task_text(
+                (old[2].get("teacherActions") or [""])[0],
+                "Қорытынды тапсырма береді: ",
+            )
+            plan["lessonObjectives"] = [
+                lesson_objective_text(record.get("objectives", "")),
+                "Шешу тәсілін математикалық тілде түсіндіріп, нәтижесін тексереді және қатесін түзетеді.",
+            ]
             plan["stages"] = [
                 {
                     "name": "Ұйымдастыру кезеңі", "minutes": 5, "method": "Сабаққа дайындық", "workForm": "Бүкіл сыныппен жұмыс",
-                    "teacherActions": ["Оқушылармен сәлемдеседі, қатысымды тексереді және жағымды оқу ахуалын қалыптастырады.", "Сабақтың тақырыбы мен мақсатын таныстырады."],
+                    "teacherActions": ["Сәлемдесу.", "Сыныптағы оқушылардың көңіл күйлерін сұрап, жағымды ахуал туындату.", "Оқушыларды түгелдеу.", "Сабақтың мақсатымен таныстыру."],
                     "learnerActions": ["Сабаққа қажетті оқу құралдарын дайындайды.", "Сабақтың тақырыбы мен мақсатын қабылдайды."],
-                    "descriptors": [], "feedback": "Мұғалім оқушылардың сабаққа дайындығын ауызша қолдайды.", "resources": ["Тақта", "Оқу құралдары"], "support": "",
+                    "descriptors": [], "feedback": "Ауызша бағалау: «Өте жақсы», «Жарайсың».", "resources": ["Тақта", "Оқу құралдары"], "support": "",
                 },
                 {
                     "name": "Сабақтың басы", "minutes": 10, "method": "Алдыңғы білімді еске түсіру", "workForm": "Жеке және бүкіл сыныппен жұмыс",
-                    "teacherActions": old[0].get("teacherActions") or [], "learnerActions": old[0].get("learnerActions") or [],
+                    "teacherActions": ["Алдыңғы білімді анықтайтын қысқа тапсырма береді."], "learnerActions": old[0].get("learnerActions") or [],
+                    "tasks": [{"number": 1, "instruction": beginning_task, "descriptor": "алдыңғы білімге сүйеніп, тапсырманың дұрыс жауабын жазады және түсіндіреді", "points": 1}],
                     "descriptors": [], "feedback": "Сұрақ–жауап және қысқа ауызша кері байланыс арқылы алдыңғы білім нақтыланады.",
                     "resources": old[0].get("resources") or ["Тақта"], "support": old[0].get("support", ""),
                 },
@@ -111,12 +131,13 @@ def main() -> int:
                     "teacherActions": ["Оқулықтағы тапсырмаларды ретімен ұсынады, орындалуын бақылайды және қажет кезде бағыттаушы сұрақ береді."],
                     "learnerActions": old[1].get("learnerActions") or [], "tasks": tasks, "descriptors": [],
                     "feedback": "Әр тапсырмадан кейін дескрипторға сүйенген нақты кері байланыс беріледі; оқушы қатесін сол кезеңде түзетеді.",
-                    "resources": [source, "Тақта", "Оқу құралдары"] + (["Тақырыптық сызба"] if plan.get("visuals") else []),
+                    "resources": ["Оқулық", "Тақта", "Оқу құралдары"] + (["Тақырыптық сызба"] if plan.get("visuals") else []),
                     "support": old[1].get("support", ""), "visuals": plan.get("visuals") or [],
                 },
                 {
                     "name": "Сабақтың соңы", "minutes": 5, "method": "Қорытындылау және рефлексия", "workForm": "Жеке жұмыс",
-                    "teacherActions": old[2].get("teacherActions") or [], "learnerActions": old[2].get("learnerActions") or [],
+                    "teacherActions": ["Сабақты қорытындылайтын тапсырма береді және рефлексия ұйымдастырады."], "learnerActions": old[2].get("learnerActions") or [],
+                    "tasks": [{"number": 1, "instruction": ending_task, "descriptor": "қорытынды тапсырманы өздігінен орындайды және жауабын түсіндіреді", "points": 1}],
                     "descriptors": [], "feedback": "Мұғалім жауаптарды қысқаша қорытындылап, келесі оқу қадамын белгілейді.",
                     "resources": ["Рефлексия парағы"], "support": "",
                 },
@@ -129,12 +150,13 @@ def main() -> int:
                 "жаңадан құрастырылды."
             )
             record["prepared_plan"] = plan
-            record["quality_flags"] = list(dict.fromkeys(record.get("quality_flags", []) + ["teacher_template_5_10_25_5", "descriptors_middle_only", "atamura_pdf_page_bound"]))
+            flags = [flag for flag in record.get("quality_flags", []) if flag != "descriptors_middle_only"]
+            record["quality_flags"] = list(dict.fromkeys(flags + ["teacher_template_5_10_25_5", "descriptors_follow_tasks", "atamura_pdf_page_bound"]))
             changed += 1
 
-    data["version"] = "13-teacher-template-atamura"
+    data["version"] = "15-teacher-base-descriptors-word-visuals"
     data["prepared_plan_count"] = changed
-    data["template_policy"] = "teacher QMJ structure: 5+10+25+5; descriptors only under middle-stage tasks"
+    data["template_policy"] = "teacher QMJ structure: 5+10+25+5; descriptors directly under every learning task"
     data["textbook_page_binding_count"] = changed
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"changed": changed, "unique_book_pages": len(pages_used)}, ensure_ascii=False))
