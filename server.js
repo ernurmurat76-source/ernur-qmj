@@ -271,25 +271,50 @@ function distributeMinutes(stages) {
 function planFromReference(reference, body) {
   if (!reference) return demoPlan(body);
   if (reference.prepared_plan) return normalizePlan(reference.prepared_plan, body, null);
-  let usable = reference.stages.filter(stage => stage.teacher || stage.learner).slice(0, 6);
+  const usable = reference.stages.filter(stage => stage.teacher || stage.learner);
   if (!usable.length) return curriculumPlan(body, reference);
-  const minutes = distributeMinutes(usable);
-  const stages = usable.map((stage, index) => {
-    const beginning = /басы|ұйымдастыру|кіріспе/i.test(stage.stage || '');
-    const ending = /соңы|қорытынды|рефлек/i.test(stage.stage || '');
-    return {
-      name: stage.stage?.replace(/\s*\d{1,2}\s*(минут|мин).*$/i, '').trim() || `Сабақ кезеңі ${index + 1}`,
-      minutes: minutes[index],
-      method: ending ? 'Қысқа рефлексия' : beginning ? 'Ой қозғау' : 'Түсіндір және орында',
-      workForm: beginning ? 'Бүкіл сыныппен жұмыс' : ending ? 'Жеке жұмыс' : 'Жеке және жұптық жұмыс',
-      teacherActions: splitText(stage.teacher, ['Тапсырманы түсіндіреді және орындалуын бақылайды.']),
-      learnerActions: splitText(stage.learner, ['Берілген тапсырманы орындайды және нәтижесін түсіндіреді.']),
-      descriptors: [],
-      feedback: splitText(stage.assessment, ['Дескрипторға сай ауызша кері байланыс']).join(' '),
-      resources: splitText(stage.resources, ['Оқулық', 'Тапсырма парағы']).slice(0, 5),
-      support: 'Қажет оқушыға үлгі, тірек сөз немесе кезеңдік нұсқаулық беріледі.'
-    };
-  });
+  const organization = usable[0];
+  const detectedEndingIndex = usable.findLastIndex(stage => /соңы|қорытынды|рефлек/i.test(stage.stage || ''));
+  const endingIndex = detectedEndingIndex > 1 ? detectedEndingIndex : Math.max(1, usable.length - 1);
+  const beginningIndex = usable.findIndex((stage, index) => index > 0 && index < endingIndex && /басы|кіріспе/i.test(stage.stage || ''));
+  const actualBeginningIndex = beginningIndex > 0 ? beginningIndex : 1;
+  const ending = usable[endingIndex] || usable[usable.length - 1];
+  const middleParts = usable.filter((stage, index) => index > actualBeginningIndex && index < endingIndex);
+  if (!middleParts.length && usable[actualBeginningIndex]) middleParts.push(usable[actualBeginningIndex]);
+  const merge = (parts, key, fallback) => parts.flatMap(stage => splitText(stage?.[key], [])).filter(Boolean).length
+    ? parts.flatMap(stage => splitText(stage?.[key], [])).filter(Boolean)
+    : fallback;
+  const endingTeacher = splitText(ending?.teacher, ['Сабақты қорытындылайды.']);
+  const endingLearner = splitText(ending?.learner, []);
+  if (!endingTeacher.some(item => /ББҮ/i.test(item))) endingTeacher.push('ББҮ кестесі арқылы сабақ нәтижесін қорытындылауды ұйымдастырады.');
+  if (!endingLearner.some(item => /ББҮ/i.test(item))) endingLearner.push('ББҮ кестесін толтырады: «Білемін», «Білгім келеді», «Үйрендім».');
+  const stages = [
+    {
+      name: 'Ұйымдастыру кезеңі', minutes: 5, method: 'Сабаққа дайындық', workForm: 'Бүкіл сыныппен жұмыс',
+      teacherActions: splitText(organization?.teacher, ['Сәлемдесу.', 'Оқушыларды түгелдеу.', 'Сабақтың мақсатымен таныстыру.']),
+      learnerActions: splitText(organization?.learner, ['Сабаққа дайындалады.']), descriptors: [],
+      feedback: splitText(organization?.assessment, ['Ауызша бағалау']).join(' '), resources: splitText(organization?.resources, ['Оқу құралдары']).slice(0, 5), support: ''
+    },
+    {
+      name: 'Сабақтың басы', minutes: 10, method: 'Алдыңғы білімді еске түсіру', workForm: 'Бүкіл сыныппен жұмыс',
+      teacherActions: splitText(usable[actualBeginningIndex]?.teacher, ['Алдыңғы білімді еске түсіреді.']),
+      learnerActions: splitText(usable[actualBeginningIndex]?.learner, ['Сұрақтарға жауап береді.']), descriptors: [],
+      feedback: splitText(usable[actualBeginningIndex]?.assessment, ['Ауызша кері байланыс']).join(' '), resources: splitText(usable[actualBeginningIndex]?.resources, ['Тақта']).slice(0, 5), support: ''
+    },
+    {
+      name: 'Сабақтың ортасы', minutes: 25, method: 'Оқулықпен жұмыс', workForm: 'Жеке және жұптық жұмыс',
+      teacherActions: merge(middleParts, 'teacher', ['Тақырыпқа сәйкес оқулық тапсырмаларын ұсынады.']),
+      learnerActions: merge(middleParts, 'learner', ['Тапсырмаларды орындайды.']), descriptors: [],
+      feedback: merge(middleParts, 'assessment', ['Дескриптор бойынша бағалау']).join(' '),
+      resources: [...new Set(merge(middleParts, 'resources', ['Оқулық', 'Тақта']))].slice(0, 5), support: 'Қажет оқушыға үлгі немесе бастапқы қадам беріледі.'
+    },
+    {
+      name: 'Сабақтың соңы', minutes: 5, method: 'Қорытындылау', workForm: 'Жеке жұмыс',
+      teacherActions: endingTeacher, learnerActions: endingLearner, descriptors: [],
+      feedback: splitText(ending?.assessment, ['Жинаған ұпайы бойынша бағаланады.']).join(' '),
+      resources: [...new Set([...splitText(ending?.resources, []), 'ББҮ кестесі'])].slice(0, 5), support: ''
+    }
+  ];
   return {
     lessonObjectives: splitText(reference.lesson_objectives, [`${body.topic} тақырыбы бойынша оқу мақсатына жету`]),
     assessmentCriteria: ['оқу мақсатына сәйкес тапсырманы орындайды', 'шешімін немесе жауабын негіздеп түсіндіреді'],
@@ -424,7 +449,17 @@ function normalizePlan(raw, body, reference = null) {
 
 function renderPlan(body, plan, model, reference = null) {
   const list = items => `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
-  const rows = plan.stages.map(stage => {
+  const organizationStage = {
+    name: 'Ұйымдастыру кезеңі', minutes: 5, teacherActions: ['Сәлемдесу.', 'Сыныптағы оқушылардың көңіл күйлерін сұрап, жағымды ахуал туындату.', 'Оқушыларды түгелдеу.', 'Сабақтың мақсатымен таныстыру.'],
+    learnerActions: ['Сабаққа дайындалады және оқу құралдарын реттейді.'], tasks: [], descriptors: [],
+    feedback: 'Ауызша бағалау: «Өте жақсы», «Жарайсың».', resources: ['Оқу құралдары'], support: '', visuals: []
+  };
+  const sourceStages = plan.stages.length === 3 ? [organizationStage, ...plan.stages] : plan.stages;
+  const stageContract = [
+    ['Ұйымдастыру кезеңі', 5], ['Сабақтың басы', 10], ['Сабақтың ортасы', 25], ['Сабақтың соңы', 5]
+  ];
+  const displayStages = sourceStages.slice(0, 4).map((stage, index) => ({ ...stage, name: stageContract[index][0], minutes: stageContract[index][1] }));
+  const rows = displayStages.map(stage => {
     const tasks = (stage.tasks || []).map(task => `<div class="lesson-task"><p><strong>${task.number}-тапсырма.</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p></div>`).join('');
     const visuals = (stage.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
     const teacher = `${list(stage.teacherActions)}${tasks}${visuals}`;

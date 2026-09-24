@@ -89,6 +89,11 @@ async function main() {
     assert.equal(generatedFromBase.data.reference.id, selected.id);
     assert.ok(generatedFromBase.data.html.includes('45 минут'));
     assert.ok(generatedFromBase.data.html.includes('width:32.7%'));
+    assert.ok(generatedFromBase.data.html.includes('Ұйымдастыру кезеңі</strong><br>5 минут'));
+    assert.ok(generatedFromBase.data.html.includes('Сабақтың басы</strong><br>10 минут'));
+    assert.ok(generatedFromBase.data.html.includes('Сабақтың ортасы</strong><br>25 минут'));
+    assert.ok(generatedFromBase.data.html.includes('Сабақтың соңы</strong><br>5 минут'));
+    assert.ok(generatedFromBase.data.html.includes('ББҮ'));
     const termTwo = await request('/api/references?grade=5-%D1%81%D1%8B%D0%BD%D1%8B%D0%BF&subject=%D0%9C%D0%B0%D1%82%D0%B5%D0%BC%D0%B0%D1%82%D0%B8%D0%BA%D0%B0&term=2', { headers: teacherAuth });
     assert.equal(termTwo.data.references.length, 39);
     const termTwoLesson = termTwo.data.references[0];
@@ -106,9 +111,13 @@ async function main() {
     assert.ok(!generatedTermTwo.data.html.includes('Бағалау критерийлері'));
     assert.equal((generatedTermTwo.data.html.match(/Дескриптор —/g) || []).length, 6);
     assert.equal((generatedTermTwo.data.html.match(/45 минут/g) || []).length, 1);
+    assert.ok(generatedTermTwo.data.html.includes('ББҮ кестесін толтырады'));
     const clientScript = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'app.js'), 'utf8');
     assert.ok(clientScript.includes("canvas.toDataURL('image/png')"));
     assert.ok(clientScript.includes('Content-ID: <${attachment.cid}>'));
+    assert.ok(clientScript.includes('padding:2pt'));
+    assert.ok(clientScript.includes('line-height:1.0'));
+    assert.ok(clientScript.includes('max-height:150pt'));
     assert.equal(generatedTermTwo.data.model, 'Дайын ҚМЖ базасы · ЖИ қолданылмады');
     const blockedSubject = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(blockedSubject.status, 403);
@@ -118,6 +127,10 @@ async function main() {
     const generated = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Қазақстан тарихы', grade: '7-сынып', term: '2', language: 'Қазақ тілі', section: 'Бөлім', topic: 'Тақырып', objective: '7.1.1.1 — мақсат' }) });
     assert.equal(generated.status, 200);
     assert.ok(generated.data.html.includes('45 минут'));
+    assert.ok(generated.data.html.includes('Ұйымдастыру кезеңі</strong><br>5 минут'));
+    assert.ok(generated.data.html.includes('Сабақтың басы</strong><br>10 минут'));
+    assert.ok(generated.data.html.includes('Сабақтың ортасы</strong><br>25 минут'));
+    assert.ok(generated.data.html.includes('Сабақтың соңы</strong><br>5 минут'));
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'toggle', isActive: false }) })).status, 200);
     assert.equal((await request('/api/access/verify', { method: 'POST', headers: teacherAuth, body: '{}' })).status, 401);
     assert.equal((await request(`/api/admin/codes/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ action: 'toggle', isActive: true }) })).status, 200);

@@ -136,10 +136,11 @@ def main() -> int:
                 },
                 {
                     "name": "Сабақтың соңы", "minutes": 5, "method": "Қорытындылау және рефлексия", "workForm": "Жеке жұмыс",
-                    "teacherActions": ["Сабақты қорытындылайтын тапсырма береді және рефлексия ұйымдастырады."], "learnerActions": old[2].get("learnerActions") or [],
+                    "teacherActions": ["Сабақты қорытындылайтын тапсырма береді.", "ББҮ кестесі арқылы сабақ нәтижесін қорытындылауды ұйымдастырады."],
+                    "learnerActions": (old[2].get("learnerActions") or []) + ["ББҮ кестесін толтырады: «Білемін», «Білгім келеді», «Үйрендім»."],
                     "tasks": [{"number": 1, "instruction": ending_task, "descriptor": "қорытынды тапсырманы өздігінен орындайды және жауабын түсіндіреді", "points": 1}],
                     "descriptors": [], "feedback": "Мұғалім жауаптарды қысқаша қорытындылап, келесі оқу қадамын белгілейді.",
-                    "resources": ["Рефлексия парағы"], "support": "",
+                    "resources": ["ББҮ кестесі", "Рефлексия парағы"], "support": "",
                 },
             ]
             plan["templateStatus"] = "teacher-provided-qmj-structure"
@@ -154,7 +155,7 @@ def main() -> int:
             record["quality_flags"] = list(dict.fromkeys(flags + ["teacher_template_5_10_25_5", "descriptors_follow_tasks", "atamura_pdf_page_bound"]))
             changed += 1
 
-    data["version"] = "15-teacher-base-descriptors-word-visuals"
+    data["version"] = "17-fixed-stages-bbu"
     data["prepared_plan_count"] = changed
     data["template_policy"] = "teacher QMJ structure: 5+10+25+5; descriptors directly under every learning task"
     data["textbook_page_binding_count"] = changed

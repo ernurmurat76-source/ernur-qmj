@@ -40,6 +40,8 @@ def main() -> int:
             errors.append(f'{record.get("id")}: дайын ҚМЖ 45 минут емес')
         if [int(stage.get("minutes", 0)) for stage in stages] != [5, 10, 25, 5]:
             errors.append(f'{record.get("id")}: кезеңдер 5–10–25–5 минутқа бөлінбеген')
+        if [stage.get("name") for stage in stages] != ["Ұйымдастыру кезеңі", "Сабақтың басы", "Сабақтың ортасы", "Сабақтың соңы"]:
+            errors.append(f'{record.get("id")}: кезең атаулары мұғалім үлгісіне сәйкес емес')
         for index, stage in enumerate(stages):
             if not stage.get("teacherActions") or not stage.get("learnerActions"):
                 errors.append(f'{record.get("id")}: кезең әрекеттері толық емес')
@@ -58,6 +60,8 @@ def main() -> int:
                     errors.append(f'{record.get("id")}: тапсырмада артық оқулық беті көрсетілген')
         if plan.get("assessmentCriteria"):
             errors.append(f'{record.get("id")}: артық бағалау критерийлері жолы сақталған')
+        if not any("ББҮ" in str(item) for item in (stages[3].get("learnerActions") or [])):
+            errors.append(f'{record.get("id")}: қорытындыда ББҮ кестесі жоқ')
         if "КТЖ-да берілген оқу мақсатына сәйкес" in " ".join(plan.get("lessonObjectives") or []):
             errors.append(f'{record.get("id")}: сабақ мақсатында артық КТЖ мәтіні сақталған')
         binding = plan.get("textbookPageBinding") or {}

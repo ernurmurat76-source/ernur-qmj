@@ -35,7 +35,7 @@ def main() -> int:
                     for item in resources
                 ]
         plan.pop("sourceNote", None)
-    data["version"] = "15-teacher-base-descriptors-word-visuals"
+    data["version"] = "17-fixed-stages-bbu"
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"removed_task_labels": changed}, ensure_ascii=False))
     return 0
