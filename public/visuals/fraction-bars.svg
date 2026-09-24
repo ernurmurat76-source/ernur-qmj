@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="280" viewBox="0 0 620 280" role="img" aria-labelledby="title desc">
+<title id="title">Бөлшек жолақтары</title><desc id="desc">ҚМЖ тапсырмасына арналған авторлық математикалық сызба</desc><style>
+text{font-family:Arial,sans-serif;fill:#14213d;font-size:15px}.label{font-weight:700}
+.axis{stroke:#334155;stroke-width:2}.shape{stroke:#2563eb;stroke-width:3;fill:none}
+.accent{stroke:#f97316;stroke-width:3;fill:none}.soft{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+.grid{stroke:#cbd5e1;stroke-width:1}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:6 5;fill:none}
+</style>
+<rect width="620" height="280" rx="18" fill="#f8fafc"/><text x="30" y="36" class="label">Бөлшек жолақтары</text><rect x="45" y="75" width="480" height="48" class="shape"/><path d="M105 75v48m60-48v48m60-48v48m60-48v48m60-48v48m60-48v48m60-48v48" class="axis"/><rect x="45" y="75" width="180" height="48" fill="#93c5fd"/><rect x="225" y="75" width="120" height="48" fill="#fdba74"/><text x="45" y="165">Боялған бөліктерді ортақ бөліммен қос.</text></svg>

@@ -43,6 +43,21 @@ def main() -> int:
                 errors.append(f'{record.get("id")}: кезең әрекеттері толық емес')
             if not stage.get("descriptors") or any(int(item.get("points", 0)) < 1 for item in stage.get("descriptors", [])):
                 errors.append(f'{record.get("id")}: дескриптор немесе балл толық емес')
+        middle = stages[1] if len(stages) > 1 else {}
+        teacher_text = " ".join(middle.get("teacherActions") or [])
+        if not all(marker in teacher_text for marker in ("1-тапсырма", "2-тапсырма", "3-тапсырма", "4-тапсырма")):
+            errors.append(f'{record.get("id")}: нақты төрт оқу тапсырмасы толық емес')
+        if not plan.get("answerKey"):
+            errors.append(f'{record.get("id")}: мұғалімге арналған жауап кілті жоқ')
+        if not plan.get("textbookSources"):
+            errors.append(f'{record.get("id")}: Атамұра оқулығымен сәйкестік көрсетілмеген')
+        if record.get("textbook_alignment", {}).get("publisher") != "Атамұра":
+            errors.append(f'{record.get("id")}: оқулық дереккөзі белгіленбеген')
+        for visual in plan.get("visuals") or []:
+            src = str(visual.get("src", ""))
+            visual_file = path.parent.parent / "public" / src.lstrip("/")
+            if not src.startswith("/visuals/") or not visual_file.is_file():
+                errors.append(f'{record.get("id")}: көрнекілік файлы табылмады: {src}')
 
     counts = Counter((record.get("grade"), record.get("subject"), record.get("track", ""), record.get("term")) for record in new_records)
     required = []
@@ -63,6 +78,8 @@ def main() -> int:
         "records": len(records),
         "new_ktz_records": len(new_records),
         "prepared_plans": sum(bool(record.get("prepared_plan")) for record in new_records),
+        "atamura_aligned": sum(record.get("textbook_alignment", {}).get("publisher") == "Атамұра" for record in new_records),
+        "plans_with_visuals": sum(bool(record.get("prepared_plan", {}).get("visuals")) for record in new_records),
         "covered_groups": len(counts),
         "errors": errors,
     }

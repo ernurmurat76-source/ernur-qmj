@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="280" viewBox="0 0 620 280" role="img" aria-labelledby="title desc">
+<title id="title">Пифагор теоремасы</title><desc id="desc">ҚМЖ тапсырмасына арналған авторлық математикалық сызба</desc><style>
+text{font-family:Arial,sans-serif;fill:#14213d;font-size:15px}.label{font-weight:700}
+.axis{stroke:#334155;stroke-width:2}.shape{stroke:#2563eb;stroke-width:3;fill:none}
+.accent{stroke:#f97316;stroke-width:3;fill:none}.soft{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+.grid{stroke:#cbd5e1;stroke-width:1}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:6 5;fill:none}
+</style>
+<rect width="620" height="280" rx="18" fill="#f8fafc"/><text x="30" y="30" class="label">Тікбұрышты үшбұрыш</text><path d="M115 225H480L115 65Z" class="shape"/><path d="M115 205h20v20" class="axis"/><text x="280" y="250">a</text><text x="82" y="150">b</text><text x="300" y="130">c</text><text x="360" y="55">a²+b²=c²</text></svg>

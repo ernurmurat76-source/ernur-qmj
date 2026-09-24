@@ -401,7 +401,15 @@ function normalizePlan(raw, body, reference = null) {
     assessmentCriteria: asList(raw?.assessmentCriteria, fallback.assessmentCriteria),
     stages,
     differentiation: String(raw?.differentiation || fallback.differentiation).trim(),
-    safety: String(raw?.safety || fallback.safety).trim()
+    safety: String(raw?.safety || fallback.safety).trim(),
+    visuals: (Array.isArray(raw?.visuals) ? raw.visuals : []).map(item => ({
+      src: /^\/visuals\/[a-z0-9-]+\.svg$/i.test(String(item?.src || '')) ? String(item.src) : '',
+      alt: String(item?.alt || 'Математикалық сызба').trim(),
+      caption: String(item?.caption || '').trim()
+    })).filter(item => item.src).slice(0, 2),
+    answerKey: asList(raw?.answerKey, []),
+    textbookSources: asList(raw?.textbookSources, []),
+    sourceNote: String(raw?.sourceNote || '').trim()
   };
 }
 
@@ -413,10 +421,18 @@ function renderPlan(body, plan, model, reference = null) {
     const assessment = `<strong>Дескрипторлар — ${points} балл:</strong>${list(stage.descriptors.map(item => `${item.text} — ${item.points}`))}<p><strong>Кері байланыс:</strong> ${escapeHtml(stage.feedback)}</p>${stage.support ? `<p><strong>Қолдау:</strong> ${escapeHtml(stage.support)}</p>` : ''}`;
     return `<tr><td><strong>${escapeHtml(stage.name)}</strong><br>${stage.minutes} минут</td><td>${teacher}</td><td>${list(stage.learnerActions)}</td><td>${assessment}</td><td>${list(stage.resources)}</td></tr>`;
   }).join('');
+  const visuals = (plan.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
+  const visualSection = visuals ? `<section class="visual-support"><h3>Көрнекі қолдау</h3>${visuals}</section>` : '';
+  const sources = plan.textbookSources?.length ? `<p><strong>Оқулықпен сәйкестік:</strong> ${escapeHtml(plan.textbookSources.join('; '))}</p>` : '';
+  const sourceNote = plan.sourceNote ? `<p><em>${escapeHtml(plan.sourceNote)}</em></p>` : '';
+  const answerKey = plan.answerKey?.length ? `<details class="answer-key"><summary><strong>Мұғалімге арналған қысқа жауап кілті</strong></summary>${list(plan.answerKey)}</details>` : '';
   const valuesRow = reference?.values ? `<tr><th>Құндылықтар</th><td>${escapeHtml(reference.values)}</td></tr>` : '';
   const html = `<article class="qmj-document"><h2>Қысқа мерзімді (сабақ) жоспары</h2><p class="legal-note">№130 бұйрық нысанының міндетті тармақтарына негізделген</p><table class="meta-table"><colgroup><col style="width:28.4%"><col style="width:71.6%"></colgroup><tr><th>Білім беру ұйымының атауы</th><td>${escapeHtml(body.organization || '____________________________')}</td></tr><tr><th>Бөлім</th><td>${escapeHtml(body.section)}</td></tr><tr><th>Педагогтің тегі, аты, әкесінің аты</th><td>${escapeHtml(body.teacher || '____________________________')}</td></tr><tr><th>Күні</th><td>${escapeHtml(body.date || '________________')}</td></tr><tr><th>Сынып</th><td>${escapeHtml(body.grade)} &nbsp; Қатысқандар саны: ${escapeHtml(body.present || '____')} &nbsp; Қатыспағандар саны: ${escapeHtml(body.absent || '____')}</td></tr><tr><th>Сабақтың тақырыбы</th><td>${escapeHtml(body.topic)}</td></tr><tr><th>Оқу бағдарламасына сәйкес оқыту мақсаттары</th><td>${escapeHtml(body.objective)}</td></tr><tr><th>Сабақтың мақсаты</th><td>${list(plan.lessonObjectives)}</td></tr><tr><th>Бағалау критерийлері <small>(әдістемелік толықтыру)</small></th><td>${list(plan.assessmentCriteria)}</td></tr>${valuesRow}</table><table class="flow-table"><colgroup><col style="width:8.8%"><col style="width:32.7%"><col style="width:35.3%"><col style="width:11.8%"><col style="width:11.4%"></colgroup><thead><tr class="flow-title"><th colspan="5">Сабақ барысы: 45 минут</th></tr><tr><th>Уақыты/кезеңдері</th><th>Педагогтің әрекеті</th><th>Оқушының әрекеті</th><th>Бағалау</th><th>Ресурстар</th></tr></thead><tbody>${rows}</tbody></table><section class="method-notes"><h3>Әдістемелік толықтырулар</h3><p><strong>Саралау және қолдау:</strong> ${escapeHtml(plan.differentiation)}</p><p><strong>Қауіпсіздік:</strong> ${escapeHtml(plan.safety)}</p><p><em>Бағалау критерийлері, дескрипторлар, баллдар, саралау және қауіпсіздік түсіндірмелері — ҚМЖ сапасын күшейтетін әдістемелік толықтырулар.</em></p></section></article>`;
+  const enrichedHtml = html
+    .replace('</tbody></table><section class="method-notes">', `</tbody></table>${visualSection}<section class="method-notes">`)
+    .replace('<p><em>Бағалау критерийлері,', `${sources}${sourceNote}${answerKey}<p><em>Бағалау критерийлері,`);
   const text = `Қысқа мерзімді (сабақ) жоспары\nПән: ${body.subject}\nСынып: ${body.grade}\nБөлім: ${body.section}\nТақырып: ${body.topic}\nОқу мақсаты: ${body.objective}`;
-  return { html, text, model, format: 'qmj-130', reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
+  return { html: enrichedHtml, text, model, format: 'qmj-130', reference: reference ? { id: reference.id, topic: reference.topic, source: reference.source.collection } : null };
 }
 
 function apiConfig() {

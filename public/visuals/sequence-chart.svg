@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="280" viewBox="0 0 620 280" role="img" aria-labelledby="title desc">
+<title id="title">Арифметикалық прогрессия</title><desc id="desc">ҚМЖ тапсырмасына арналған авторлық математикалық сызба</desc><style>
+text{font-family:Arial,sans-serif;fill:#14213d;font-size:15px}.label{font-weight:700}
+.axis{stroke:#334155;stroke-width:2}.shape{stroke:#2563eb;stroke-width:3;fill:none}
+.accent{stroke:#f97316;stroke-width:3;fill:none}.soft{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+.grid{stroke:#cbd5e1;stroke-width:1}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:6 5;fill:none}
+</style>
+<rect width="620" height="280" rx="18" fill="#f8fafc"/><text x="30" y="30" class="label">Сандар тізбегі</text><circle cx="90" cy="145" r="28" class="soft"/><circle cx="220" cy="145" r="28" class="soft"/><circle cx="350" cy="145" r="28" class="soft"/><circle cx="480" cy="145" r="28" class="soft"/><path d="M120 145h70m60 0h70m60 0h70" class="axis"/><text x="83" y="151">a₁</text><text x="211" y="151">a₂</text><text x="341" y="151">a₃</text><text x="471" y="151">aₙ</text><text x="160" y="125">+d</text><text x="290" y="125">+d</text></svg>

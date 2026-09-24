@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="280" viewBox="0 0 620 280" role="img" aria-labelledby="title desc">
+<title id="title">Дифференциалдық теңдеудің бағыттар өрісі</title><desc id="desc">ҚМЖ тапсырмасына арналған авторлық математикалық сызба</desc><style>
+text{font-family:Arial,sans-serif;fill:#14213d;font-size:15px}.label{font-weight:700}
+.axis{stroke:#334155;stroke-width:2}.shape{stroke:#2563eb;stroke-width:3;fill:none}
+.accent{stroke:#f97316;stroke-width:3;fill:none}.soft{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+.grid{stroke:#cbd5e1;stroke-width:1}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:6 5;fill:none}
+</style>
+<rect width="620" height="280" rx="18" fill="#f8fafc"/><text x="30" y="30" class="label">Бағыттар өрісі</text><path d="M60 230H570M300 250V45" class="axis"/><g class="shape"><path d="M110 190l25-8m65-2 25-2m65-8 25 2m65-12 25 8m65-18 25 12M110 125l25-15m65 5 25-8m65 2 25 2m65-4 25 8m65-16 25 15M110 70l25-20m65 10 25-14m65 10 25-6m65 0 25 6m65-16 25 20"/></g></svg>

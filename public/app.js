@@ -149,10 +149,19 @@ async function copyPlan() {
   toast('ҚМЖ мәтіні көшірілді');
 }
 
-function downloadWord() {
+async function downloadWord() {
   if (!current.html) return;
   const topic = $('#topic').value.trim() || 'QMJ';
-  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:1cm 1.5cm 1cm 1.25cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15}h2,h3{text-align:center;font-size:12pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:4px;vertical-align:top}.meta-table th{width:auto;text-align:left;background:#fff}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table .flow-title th{font-size:12pt}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:16px}.legal-note{font-size:10pt;text-align:center}.method-notes{margin-top:12px;font-size:12pt}</style></head><body>${current.html}</body></html>`;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = current.html;
+  await Promise.all([...wrapper.querySelectorAll('img[src^="/visuals/"]')].map(async img => {
+    try {
+      const response = await fetch(img.getAttribute('src'));
+      const svg = await response.text();
+      img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+    } catch { /* ҚМЖ сурет жүктелмесе де мәтінмен сақталады. */ }
+  }));
+  const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:1cm 1.5cm 1cm 1.25cm}body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.15}h2,h3{text-align:center;font-size:12pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #000;padding:4px;vertical-align:top}.meta-table th{width:auto;text-align:left;background:#fff}.flow-table{font-size:10pt;margin-top:0}.flow-table th{font-size:10pt;text-align:center;background:#fff}.flow-table .flow-title th{font-size:12pt}.flow-table th:nth-child(1){width:8.8%}.flow-table th:nth-child(2){width:32.7%}.flow-table th:nth-child(3){width:35.3%}.flow-table th:nth-child(4){width:11.8%}.flow-table th:nth-child(5){width:11.4%}ul{margin:0;padding-left:16px}.legal-note{font-size:10pt;text-align:center}.method-notes{margin-top:12px;font-size:12pt}.math-visual{text-align:center;page-break-inside:avoid}.math-visual img{max-width:520px;width:100%;height:auto}.math-visual figcaption{font-size:10pt}.answer-key{margin-top:8px}</style></head><body>${wrapper.innerHTML}</body></html>`;
   const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);

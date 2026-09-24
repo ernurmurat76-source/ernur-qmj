@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="280" viewBox="0 0 620 280" role="img" aria-labelledby="title desc">
+<title id="title">Сан сәулесі</title><desc id="desc">ҚМЖ тапсырмасына арналған авторлық математикалық сызба</desc><style>
+text{font-family:Arial,sans-serif;fill:#14213d;font-size:15px}.label{font-weight:700}
+.axis{stroke:#334155;stroke-width:2}.shape{stroke:#2563eb;stroke-width:3;fill:none}
+.accent{stroke:#f97316;stroke-width:3;fill:none}.soft{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+.grid{stroke:#cbd5e1;stroke-width:1}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:6 5;fill:none}
+</style>
+<rect width="620" height="280" rx="18" fill="#f8fafc"/><text x="30" y="36" class="label">Сан сәулесі</text><path d="M55 145H565m-12-8 12 8-12 8" class="axis"/><g class="axis"><path d="M125 132v26m80-26v26m80-26v26m80-26v26m80-26v26"/></g><g><text x="116" y="182">−2</text><text x="198" y="182">−1</text><text x="280" y="182">0</text><text x="361" y="182">1</text><text x="441" y="182">2</text></g><circle cx="365" cy="145" r="7" fill="#f97316"/></svg>
