@@ -133,6 +133,7 @@ async function main() {
     const clientScript = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'app.js'), 'utf8');
     assert.ok(clientScript.includes("canvas.toDataURL('image/png')"));
     assert.ok(clientScript.includes('buildGeneratedDocx'));
+    assert.ok(clientScript.includes("wrapper.querySelector('.qmj-document')"));
     assert.ok(clientScript.includes('[933, 3467, 3743, 1251, 1208]'));
     assert.ok(clientScript.includes('<w:tblLayout w:type="fixed"/>'));
     assert.ok(clientScript.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document'));

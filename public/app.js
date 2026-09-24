@@ -367,12 +367,13 @@ function wordTable(table, context) {
 }
 
 async function buildGeneratedDocx(wrapper) {
-  const assets = await collectWordImages(wrapper);
-  const title = wrapper.querySelector(':scope > h2');
-  const legal = wrapper.querySelector(':scope > .legal-note');
-  const meta = wrapper.querySelector(':scope > .meta-table');
-  const heading = wrapper.querySelector(':scope > .flow-heading');
-  const flow = wrapper.querySelector(':scope > .flow-table');
+  const documentRoot = wrapper.matches?.('.qmj-document') ? wrapper : (wrapper.querySelector('.qmj-document') || wrapper);
+  const assets = await collectWordImages(documentRoot);
+  const title = documentRoot.querySelector(':scope > h2');
+  const legal = documentRoot.querySelector(':scope > .legal-note');
+  const meta = documentRoot.querySelector(':scope > .meta-table');
+  const heading = documentRoot.querySelector(':scope > .flow-heading');
+  const flow = documentRoot.querySelector(':scope > .flow-table');
   const context = { assets, size: 20 };
   const body = `${title ? wordParagraph(title, { size: 24, bold: true, align: 'center', after: 20 }) : ''}${legal ? wordParagraph(legal, { size: 18, align: 'center', after: 40 }) : ''}${meta ? wordTable(meta, context) : ''}${heading ? wordParagraph(heading, { size: 22, bold: true, align: 'center', before: 40, after: 20 }) : ''}${flow ? wordTable(flow, context) : ''}`;
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="425" w:right="652" w:bottom="425" w:left="652" w:header="0" w:footer="0" w:gutter="0"/><w:cols w:space="0"/><w:docGrid w:linePitch="240"/></w:sectPr></w:body></w:document>`;
