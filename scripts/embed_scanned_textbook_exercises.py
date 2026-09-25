@@ -554,28 +554,39 @@ def main() -> int:
             if not exercises:
                 continue
             for index, record in enumerate(items):
-                exercise = exercises[index % len(exercises)]
+                chosen = [exercises[(index * 5 + offset) % len(exercises)] for offset in range(5)]
+                exercise = chosen[0]
                 plan = record["prepared_plan"]
                 stage = middle_stage(plan)
                 if not stage or not stage.get("tasks"):
                     continue
-                filename = crop_exercise(source, book, exercise, args.tessdata, args.cache, args.images)
-                visual = {
-                    "src": f"/textbook-excerpts/{filename}",
-                    "alt": f"№{exercise.number} есептің кітаптағы нұсқасы",
-                    "caption": f"№{exercise.number} есеп",
-                    "kind": "textbook-excerpt",
-                }
+                selected = []
+                for selected_exercise in chosen:
+                    filename = crop_exercise(source, book, selected_exercise, args.tessdata, args.cache, args.images)
+                    visual = {
+                        "src": f"/textbook-excerpts/{filename}",
+                        "alt": f"№{selected_exercise.number} есептің кітаптағы нұсқасы",
+                        "caption": f"№{selected_exercise.number} есеп",
+                        "kind": "textbook-excerpt",
+                    }
+                    selected.append({
+                        "number": selected_exercise.number,
+                        "text": selected_exercise.text,
+                        "pdfPage": selected_exercise.page_index + 1,
+                        "mode": "exact-scanned-ocr",
+                        "visual": visual,
+                    })
                 # These are the only visible QMJ fields deliberately changed.
                 stage["tasks"][0]["instruction"] = exercise.text
-                stage["visuals"] = [visual]
-                plan["visuals"] = [visual]
+                stage["visuals"] = [selected[0]["visual"]]
+                plan["visuals"] = [selected[0]["visual"]]
                 plan["textbookExercise"] = {
                     "number": exercise.number,
                     "text": exercise.text,
                     "pdfPage": exercise.page_index + 1,
                     "mode": "exact-scanned-ocr",
                 }
+                plan["textbookExercises"] = selected
                 plan["textbookPageBinding"]["pdfPage"] = exercise.page_index + 1
                 flags = record.get("quality_flags") or []
                 record["quality_flags"] = list(dict.fromkeys(flags + [

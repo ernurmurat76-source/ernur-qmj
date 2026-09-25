@@ -108,10 +108,12 @@ async function main() {
     const generatedTermTwo = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ subject: 'Математика', grade: '5-сынып', term: '2', language: 'Қазақ тілі', section: termTwoLesson.section, topic: termTwoLesson.topic, objective: termTwoLesson.objectives }) });
     assert.equal(generatedTermTwo.status, 200);
     assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
-    assert.ok(generatedTermTwo.data.html.includes('1-тапсырма.'));
+    assert.ok(generatedTermTwo.data.html.includes('№'));
     assert.ok(generatedTermTwo.data.html.includes('/textbook-excerpts/task-'));
     assert.ok(!generatedTermTwo.data.html.includes('Оқулық үзіндісіндегі есепті немесе мысалды'));
-    assert.ok(/1-тапсырма\.<\/strong>\s+[^<]{12,}/.test(generatedTermTwo.data.html));
+    assert.ok(/№\d+(?:[.)]\d+)? есеп\.<\/strong>\s+[^<]{12,}/.test(generatedTermTwo.data.html));
+    assert.equal((generatedTermTwo.data.html.match(/<figure class="math-visual">/g) || []).length, 5);
+    assert.equal((generatedTermTwo.data.html.match(/есептің шешу жолы:/g) || []).length, 5);
     const excerptPath = generatedTermTwo.data.html.match(/\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg/)[0];
     const excerptResponse = await fetch(`http://127.0.0.1:${appPort}${excerptPath}`);
     assert.equal(excerptResponse.status, 200);

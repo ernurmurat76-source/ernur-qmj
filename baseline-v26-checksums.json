@@ -1,0 +1,14 @@
+{
+  "public/app.js": {
+    "sha256": "6fb8eefd5baf4f807714a989ee23132433e2011ec5ee4fbe0f6ae5e0deec189d",
+    "bytes": 24253
+  },
+  "server.js": {
+    "sha256": "1415027a2309e85fb9be48b20812c58207eb32e78f7d32cd6ffd2a3db6ceff36",
+    "bytes": 56128
+  },
+  "data/qmj-reference-index.json": {
+    "sha256": "37349e41c1b390d09006576d23e49b323d51e1c080ae989662c7dcc7f311a78b",
+    "bytes": 21796890
+  }
+}

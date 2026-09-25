@@ -81,9 +81,10 @@ def main() -> int:
         if record.get("textbook_alignment", {}).get("publisher") != "Атамұра":
             errors.append(f'{record.get("id")}: оқулық дереккөзі белгіленбеген')
         visuals = plan.get("visuals") or []
-        if len(visuals) != 1 or visuals[0].get("kind") != "textbook-excerpt":
+        task_visuals = [task.get("visual") for stage in stages[1:3] for task in (stage.get("tasks") or [])]
+        if len(visuals) != 5 or len(task_visuals) != 5 or any(not visual or visual.get("kind") != "textbook-excerpt" for visual in task_visuals):
             errors.append(f'{record.get("id")}: оқулық тапсырмасының қиындысы тіркелмеген')
-        for visual in visuals:
+        for visual in task_visuals:
             src = str(visual.get("src", ""))
             visual_file = path.parent.parent / "public" / src.lstrip("/")
             if not src.startswith("/textbook-excerpts/task-") or not src.endswith(".jpg") or not visual_file.is_file():
