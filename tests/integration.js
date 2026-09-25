@@ -126,6 +126,9 @@ async function main() {
     assert.ok(generatedTermTwo.data.html.includes('Сабақтың ортасы</strong><br>25 минут'));
     assert.ok(!generatedTermTwo.data.html.includes('Бағалау критерийлері'));
     assert.equal((generatedTermTwo.data.html.match(/Дескриптор —/g) || []).length, 6);
+    assert.equal((generatedTermTwo.data.html.match(/class="task-values"/g) || []).length, 6);
+    assert.ok(generatedTermTwo.data.html.includes('<strong>Құндылықтар:</strong>'));
+    assert.ok(generatedTermTwo.data.html.includes('шешу қадамдарын ретімен жазады және нәтижесін тексереді'));
     assert.equal((generatedTermTwo.data.html.match(/45 минут/g) || []).length, 1);
     assert.ok(generatedTermTwo.data.html.includes('ББҮ кестесін толтырады'));
     assert.ok(generatedTermTwo.data.html.includes('<table class="bbu-table">'));
