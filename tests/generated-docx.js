@@ -45,15 +45,22 @@ async function main() {
   assert.ok(start >= 0 && end > start);
   vm.runInThisContext(source.slice(start, end), { filename: 'docx-builder.js' });
 
+  const flowRows = [
+    ['Уақыты кезеңдері', 'Педагогтің әрекеті', 'Оқушының әрекеті', 'Бағалау', 'Ресурстар'],
+    ...Array.from({ length: 25 }, (_, index) => [
+      `Сабақтың кезеңі ${index + 1}`,
+      `Оқулық есебін жазбаша орында және толық шешу жолын көрсет ${index + 1}`,
+      `Толық шешу жолын жазады және жауабын тексереді ${index + 1}`,
+      'Дескриптор бойынша бағалау',
+      'Оқулық'
+    ])
+  ];
   const nodes = {
     ':scope > h2': element('H2', 'Қысқа мерзімді сабақ жоспары'),
     ':scope > .legal-note': element('P', '№130 бұйрық нысаны'),
     ':scope > .meta-table': table('meta-table', [['Бөлім', 'Жай бөлшектер'], ['Сабақтың тақырыбы', 'Бөлшектерді салыстыру']]),
     ':scope > .flow-heading': element('P', 'Сабақ барысы: 45 минут'),
-    ':scope > .flow-table': table('flow-table', [
-      ['Уақыты кезеңдері', 'Педагогтің әрекеті', 'Оқушының әрекеті', 'Бағалау', 'Ресурстар'],
-      ['Сабақтың ортасы 25 минут', 'Оқулық есебін жазбаша орында', 'Толық шешу жолын жазады', 'Дескриптор бойынша', 'Оқулық']
-    ])
+    ':scope > .flow-table': table('flow-table', flowRows)
   };
   const documentRoot = {
     matches: selector => selector === '.qmj-document',
@@ -75,6 +82,7 @@ async function main() {
   assert.match(xml, /<w:gridCol w:w="933"\/>/);
   assert.match(xml, /<w:gridCol w:w="3467"\/>/);
   assert.match(xml, /<w:gridCol w:w="3743"\/>/);
+  assert.ok(!xml.includes('<w:tblHeader'));
   if (process.argv[2]) fs.writeFileSync(process.argv[2], buffer);
   console.log('Generated DOCX contains QMJ text and fixed five-column grid: OK');
 }

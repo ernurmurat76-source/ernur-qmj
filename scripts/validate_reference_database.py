@@ -54,8 +54,9 @@ def main() -> int:
             errors.append(f'{record.get("id")}: тапсырмалар мен дескрипторлар кезеңдерге дұрыс орналаспаған')
         middle_tasks = (stages[2].get("tasks") or []) if len(stages) > 2 else []
         first_middle_instruction = str(middle_tasks[0].get("instruction", "")) if middle_tasks else ""
-        if "Оқулық үзіндісіндегі" not in first_middle_instruction or "жазбаша" not in first_middle_instruction:
-            errors.append(f'{record.get("id")}: негізгі бөлімде оқулық есебін жазбаша орындау тапсырмасы жоқ')
+        generic_textbook_prompts = ("Оқулық үзіндісіндегі есепті немесе мысалды", "Суреттегі тақырыпқа сай тапсырмаларды орында")
+        if len(first_middle_instruction) < 12 or any(text in first_middle_instruction for text in generic_textbook_prompts):
+            errors.append(f'{record.get("id")}: негізгі бөлімде нақты жазылған есеп жоқ')
         if "written_textbook_task" not in (record.get("quality_flags") or []):
             errors.append(f'{record.get("id")}: жазбаша оқулық тапсырмасы белгіленбеген')
         for stage in stages:

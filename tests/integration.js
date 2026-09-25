@@ -110,8 +110,8 @@ async function main() {
     assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
     assert.ok(generatedTermTwo.data.html.includes('1-тапсырма.'));
     assert.ok(generatedTermTwo.data.html.includes('/textbook-excerpts/task-'));
-    assert.ok(generatedTermTwo.data.html.includes('Оқулық үзіндісіндегі'));
-    assert.ok(generatedTermTwo.data.html.includes('жазбаша орында'));
+    assert.ok(!generatedTermTwo.data.html.includes('Оқулық үзіндісіндегі есепті немесе мысалды'));
+    assert.ok(/1-тапсырма\.<\/strong>\s+[^<]{12,}/.test(generatedTermTwo.data.html));
     const excerptPath = generatedTermTwo.data.html.match(/\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg/)[0];
     const excerptResponse = await fetch(`http://127.0.0.1:${appPort}${excerptPath}`);
     assert.equal(excerptResponse.status, 200);
@@ -136,6 +136,7 @@ async function main() {
     assert.ok(clientScript.includes("wrapper.querySelector('.qmj-document')"));
     assert.ok(clientScript.includes('[933, 3467, 3743, 1251, 1208]'));
     assert.ok(clientScript.includes('<w:tblLayout w:type="fixed"/>'));
+    assert.ok(!clientScript.includes('<w:tblHeader'));
     assert.ok(clientScript.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
     assert.ok(clientScript.includes(".docx`"));
     assert.ok(clientScript.includes('img[src^="/textbook-excerpts/"]'));
