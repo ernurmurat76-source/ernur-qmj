@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const REFERENCE_PATH = path.join(__dirname, 'data', 'qmj-reference-index.json');
+const VERIFIED_EXERCISE_BANK_PATH = path.join(__dirname, 'data', 'verified-exercise-bank.json');
 const REFERENCE_DOCX_DIR = path.join(__dirname, 'data', 'reference-docx');
 const SUBJECTS = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'subjects.json'), 'utf8'));
 const AI_FREE_SUBJECTS = new Set(['Математика', 'Алгебра', 'Геометрия']);
@@ -23,9 +24,16 @@ const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPAB
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 const loginAttempts = new Map();
 let referenceDatabase = { records: [] };
+let verifiedExerciseBank = new Map();
 try {
   referenceDatabase = JSON.parse(fs.readFileSync(REFERENCE_PATH, 'utf8'));
   if (!Array.isArray(referenceDatabase.records)) referenceDatabase.records = [];
+  const verified = fs.existsSync(VERIFIED_EXERCISE_BANK_PATH)
+    ? JSON.parse(fs.readFileSync(VERIFIED_EXERCISE_BANK_PATH, 'utf8'))
+    : { entries: [] };
+  verifiedExerciseBank = new Map((verified.entries || [])
+    .filter(item => item && item.reviewState === 'ready' && item.referenceId && item.text)
+    .map(item => [String(item.referenceId), item]));
 } catch (error) {
   console.error('ҚМЖ анықтамалық базасы жүктелмеді:', error.message);
 }
@@ -281,9 +289,49 @@ function distributeMinutes(stages) {
   return result;
 }
 
+function safeTaskText(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  return text.length >= 20 && !/(?:в[>»]|в[<«]|[«»]{2,}|_{2,}|�)/.test(text);
+}
+
+function splitExerciseToTasks(text, count) {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+  const first = normalized.search(/\b1\)\s*/);
+  if (first < 0) return Array.from({ length: count }, () => normalized);
+  const instruction = normalized.slice(0, first).trim();
+  const parts = [...normalized.slice(first).matchAll(/(?:^|;\s*)(\d+\)\s*.*?)(?=(?:;\s*\d+\)\s*)|$)/g)].map(match => match[1].trim());
+  if (parts.length < 2) return Array.from({ length: count }, () => normalized);
+  const size = Math.ceil(parts.length / count);
+  return Array.from({ length: count }, (_, index) => {
+    const chunk = parts.slice(index * size, (index + 1) * size);
+    return chunk.length ? `${instruction} ${chunk.join('; ')}`.trim() : normalized;
+  });
+}
+
+function applyVerifiedExercise(plan, reference) {
+  const entry = reference ? verifiedExerciseBank.get(String(reference.id)) : null;
+  if (!entry || !safeTaskText(entry.text)) return plan;
+  const beginning = plan.stages?.find(stage => stage.name === 'Сабақтың басы');
+  const middle = plan.stages?.find(stage => stage.name === 'Сабақтың ортасы');
+  if (!beginning?.tasks?.length || !middle?.tasks || middle.tasks.length !== 4) return plan;
+  const texts = splitExerciseToTasks(entry.text, 4);
+  beginning.tasks[0] = { ...beginning.tasks[0], exerciseNumber: entry.exerciseNumber, instruction: texts[0], displayMode: 'text', visual: null };
+  middle.tasks = middle.tasks.map((task, index) => ({
+    ...task,
+    exerciseNumber: entry.exerciseNumber,
+    instruction: texts[index],
+    displayMode: 'text',
+    visual: null,
+  }));
+  beginning.learnerActions = [`№${entry.exerciseNumber} есептің берілген тармақтарын орындайды, жауабын жазады және тексереді.`];
+  middle.learnerActions = middle.tasks.map((_, index) => `№${entry.exerciseNumber} есептің ${index + 1}-тапсырмадағы тармақтарын орындайды, жауабын жазады және тексереді.`);
+  plan.textbookTaskSource = 'verified-exercise-bank';
+  return plan;
+}
+
 function planFromReference(reference, body) {
   if (!reference) return demoPlan(body);
-  if (reference.prepared_plan) return normalizePlan(reference.prepared_plan, body, null);
+  if (reference.prepared_plan) return applyVerifiedExercise(normalizePlan(reference.prepared_plan, body, null), reference);
   const usable = reference.stages.filter(stage => stage.teacher || stage.learner);
   if (!usable.length) return curriculumPlan(body, reference);
   const organization = usable[0];

@@ -109,16 +109,21 @@ async function main() {
     assert.equal(generatedTermTwo.status, 200);
     assert.equal(generatedTermTwo.data.reference.id, termTwoLesson.id);
     assert.ok(generatedTermTwo.data.html.includes('№'));
-    assert.ok(generatedTermTwo.data.html.includes('/textbook-excerpts/task-'));
     assert.ok(!generatedTermTwo.data.html.includes('Оқулық үзіндісіндегі есепті немесе мысалды'));
     assert.ok(/№\d+(?:[.)]\d+)? есеп\.<\/strong>\s+[^<]{12,}/.test(generatedTermTwo.data.html));
-    assert.equal((generatedTermTwo.data.html.match(/<figure class="math-visual">/g) || []).length, 2);
-    assert.equal((generatedTermTwo.data.html.match(/есепті орындайды, жауабын жазады және тексереді/g) || []).length, 5);
-    const excerptPath = generatedTermTwo.data.html.match(/\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg/)[0];
-    const excerptResponse = await fetch(`http://127.0.0.1:${appPort}${excerptPath}`);
-    assert.equal(excerptResponse.status, 200);
-    assert.equal(excerptResponse.headers.get('content-type'), 'image/jpeg');
-    assert.ok((await excerptResponse.arrayBuffer()).byteLength > 10000);
+    const generatedUsesVerifiedText = generatedTermTwo.data.reference.id === 'a128f4b441df5493';
+    assert.equal((generatedTermTwo.data.html.match(/<figure class="math-visual">/g) || []).length, generatedUsesVerifiedText ? 0 : 2);
+    if (generatedUsesVerifiedText) assert.ok(generatedTermTwo.data.html.includes('2/3 және 1/8'));
+    else assert.ok(generatedTermTwo.data.html.includes('/textbook-excerpts/task-'));
+    const completionPhrase = /орындайды, жауабын жазады және тексереді/g;
+    assert.equal((generatedTermTwo.data.html.match(completionPhrase) || []).length, 5);
+    if (!generatedUsesVerifiedText) {
+      const excerptPath = generatedTermTwo.data.html.match(/\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg/)[0];
+      const excerptResponse = await fetch(`http://127.0.0.1:${appPort}${excerptPath}`);
+      assert.equal(excerptResponse.status, 200);
+      assert.equal(excerptResponse.headers.get('content-type'), 'image/jpeg');
+      assert.ok((await excerptResponse.arrayBuffer()).byteLength > 10000);
+    }
     assert.ok(!generatedTermTwo.data.html.includes('бағдарлық PDF беті'));
     assert.ok(!generatedTermTwo.data.html.includes('Атамұра оқулығы'));
     assert.ok(!generatedTermTwo.data.html.includes('КТЖ-да берілген оқу мақсатына сәйкес'));
@@ -135,6 +140,16 @@ async function main() {
     assert.ok(generatedTermTwo.data.html.includes('ББҮ кестесін толтырады'));
     assert.ok(generatedTermTwo.data.html.includes('<table class="bbu-table">'));
     assert.equal(generatedTermTwo.data.referenceDocx, null);
+    const verifiedBank = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'data', 'verified-exercise-bank.json'), 'utf8'));
+    const referenceIndex = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'data', 'qmj-reference-index.json'), 'utf8'));
+    const verifiedExercise = verifiedBank.entries[0];
+    const verifiedReference = referenceIndex.records.find(item => item.id === verifiedExercise.referenceId);
+    assert.ok(verifiedReference);
+    const generatedVerified = await request('/api/generate', { method: 'POST', headers: teacherAuth, body: JSON.stringify({ referenceId: verifiedReference.id, subject: verifiedReference.subject, grade: `${verifiedReference.grade}-сынып`, term: String(verifiedReference.term), language: 'Қазақ тілі', section: verifiedReference.section, topic: verifiedReference.topic, objective: verifiedReference.objectives }) });
+    assert.equal(generatedVerified.status, 200);
+    assert.ok(generatedVerified.data.html.includes('Көбейтуді орындаңдар:'));
+    assert.equal((generatedVerified.data.html.match(/<figure class="math-visual">/g) || []).length, 0);
+    assert.ok(!/(?:в[>»]|в[<«]|[«»]{2,}|�)/.test(generatedVerified.data.html));
     const clientScript = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'app.js'), 'utf8');
     assert.ok(clientScript.includes("canvas.toDataURL('image/png')"));
     assert.ok(clientScript.includes('buildGeneratedDocx'));

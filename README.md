@@ -42,6 +42,8 @@
 - `Бағалау критерийлері (әдістемелік толықтыру)` атты артық жол шығарылмайды;
 - оқулық файлы мен ішкі бет сәйкестігі дерекқорда сақталады, бірақ ҚМЖ мәтінінде көрсетілмейді;
 - оқулық үзінділерін сайтта көрсету және Word жүктегенде PNG сурет ретінде құжаттың ішіне бірге енгізу;
+- тексерілген есептер базасы: қате OCR таңбасы бар мәтін ҚМЖ мен Word-қа өткізілмейді; қауіпсіз мәтін есеп нөмірімен және толық өрнегімен шығарылады;
+- сканерленген есептер PDF-бетімен жеке тексеру кезегіне бөлінген, сондықтан тексерілмеген бөлшек не өрнек автоматты түрде мәтінге айналмайды;
 - барлығы 1439 жазбаны сынып, пән, тақырып және оқу мақсаты бойынша барлық тоқсаннан автоматты сәйкестендіру;
 - Қазақстан мектептеріне арналған бір режим: апталық сағат жүктемесі мен КТЖ түрін таңдаудың қажеті жоқ, тоқсан міндетті емес; 10–11 сыныпқа ЖМБ/ҚГБ бағытын көрсетуге болады;
 - Ұлттық білім академиясының 2026–2027 әдістемелік нұсқау хатындағы математикалық сауаттылық, өмірлік мәнмәтін, шешімді тексеру және бірнеше стратегияны салыстыру ұсынымдарын ЖИ контекстіне қосу;
@@ -67,6 +69,10 @@ python3 scripts/generate_textbook_excerpts.py data/qmj-reference-index.json '../
 python3 scripts/enrich_textbook_written_tasks.py data/qmj-reference-index.json
 # Қажет болса, суреттен есеп нөмірлерін жергілікті OCR арқылы тану:
 python3 scripts/enrich_textbook_written_tasks.py data/qmj-reference-index.json --ocr
+# Қауіпсіз мәтіндік есептер базасын жаңарту және тексеру:
+python3 scripts/build_verified_exercise_bank.py --source ../work_v28_source_recovery/data/qmj-reference-index.json --manual data/manual-verified-exercises.json --output data/verified-exercise-bank.json
+python3 scripts/build_exercise_verification_queue.py --source ../work_v28_source_recovery/data/qmj-reference-index.json --ready-bank data/verified-exercise-bank.json --output data/exercise-verification-queue.json
+python3 scripts/validate_verified_exercise_bank.py
 ```
 
 ## Компьютерде іске қосу
