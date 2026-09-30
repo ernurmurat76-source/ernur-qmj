@@ -31,9 +31,13 @@ try {
   const verified = fs.existsSync(VERIFIED_EXERCISE_BANK_PATH)
     ? JSON.parse(fs.readFileSync(VERIFIED_EXERCISE_BANK_PATH, 'utf8'))
     : { entries: [] };
-  verifiedExerciseBank = new Map((verified.entries || [])
-    .filter(item => item && item.reviewState === 'ready' && item.referenceId && item.text)
-    .map(item => [String(item.referenceId), item]));
+  verifiedExerciseBank = new Map();
+  for (const item of (verified.entries || []).filter(item => item && item.reviewState === 'ready' && item.referenceId && item.text)) {
+    const key = String(item.referenceId);
+    const items = verifiedExerciseBank.get(key) || [];
+    items.push(item);
+    verifiedExerciseBank.set(key, items);
+  }
 } catch (error) {
   console.error('ҚМЖ анықтамалық базасы жүктелмеді:', error.message);
 }
@@ -294,37 +298,24 @@ function safeTaskText(value) {
   return text.length >= 20 && !/(?:в[>»]|в[<«]|[«»]{2,}|_{2,}|�)/.test(text);
 }
 
-function splitExerciseToTasks(text, count) {
-  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
-  const first = normalized.search(/\b1\)\s*/);
-  if (first < 0) return Array.from({ length: count }, () => normalized);
-  const instruction = normalized.slice(0, first).trim();
-  const parts = [...normalized.slice(first).matchAll(/(?:^|;\s*)(\d+\)\s*.*?)(?=(?:;\s*\d+\)\s*)|$)/g)].map(match => match[1].trim());
-  if (parts.length < 2) return Array.from({ length: count }, () => normalized);
-  const size = Math.ceil(parts.length / count);
-  return Array.from({ length: count }, (_, index) => {
-    const chunk = parts.slice(index * size, (index + 1) * size);
-    return chunk.length ? `${instruction} ${chunk.join('; ')}`.trim() : normalized;
-  });
-}
-
 function applyVerifiedExercise(plan, reference) {
-  const entry = reference ? verifiedExerciseBank.get(String(reference.id)) : null;
-  if (!entry || !safeTaskText(entry.text)) return plan;
+  const entries = reference ? (verifiedExerciseBank.get(String(reference.id)) || []) : [];
+  const selected = entries.slice(0, 4);
+  if (selected.length < 4 || new Set(selected.map(entry => entry.exerciseNumber)).size < 4 || selected.some(entry => !safeTaskText(entry.text))) return plan;
   const beginning = plan.stages?.find(stage => stage.name === 'Сабақтың басы');
   const middle = plan.stages?.find(stage => stage.name === 'Сабақтың ортасы');
   if (!beginning?.tasks?.length || !middle?.tasks || middle.tasks.length !== 4) return plan;
-  const texts = splitExerciseToTasks(entry.text, 4);
-  beginning.tasks[0] = { ...beginning.tasks[0], exerciseNumber: entry.exerciseNumber, instruction: texts[0], displayMode: 'text', visual: null };
+  const opening = selected[0];
+  beginning.tasks[0] = { ...beginning.tasks[0], exerciseNumber: opening.exerciseNumber, instruction: opening.text, displayMode: 'text', visual: null };
   middle.tasks = middle.tasks.map((task, index) => ({
     ...task,
-    exerciseNumber: entry.exerciseNumber,
-    instruction: texts[index],
+    exerciseNumber: selected[index].exerciseNumber,
+    instruction: selected[index].text,
     displayMode: 'text',
     visual: null,
   }));
-  beginning.learnerActions = [`№${entry.exerciseNumber} есептің берілген тармақтарын орындайды, жауабын жазады және тексереді.`];
-  middle.learnerActions = middle.tasks.map((_, index) => `№${entry.exerciseNumber} есептің ${index + 1}-тапсырмадағы тармақтарын орындайды, жауабын жазады және тексереді.`);
+  beginning.learnerActions = [`№${opening.exerciseNumber} есепті орындайды, жауабын жазады және тексереді.`];
+  middle.learnerActions = middle.tasks.map(task => `№${task.exerciseNumber} есепті орындайды, жауабын жазады және тексереді.`);
   plan.textbookTaskSource = 'verified-exercise-bank';
   return plan;
 }

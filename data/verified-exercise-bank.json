@@ -1707,6 +1707,19 @@
       "reviewState": "ready"
     },
     {
+      "id": "manual-5-grade-478",
+      "referenceId": "a128f4b441df5493",
+      "grade": 5,
+      "subject": "Математика",
+      "term": 2,
+      "topic": "Жай бөлшектерді ортақ бөлімге келтіру. Жай бөлшектерді және аралас сандарды салыстыру",
+      "exerciseNumber": "478",
+      "text": "478. 2/4, 15/20, 6/8, 5/10, 8/16, 9/12 бөлшектерінен: 1) 1/2-ге; 2) 3/4-ке тең бөлшектерді тауып, оқыңдар.",
+      "source": "manual-page-verification",
+      "verification": "source-page-visual-check",
+      "reviewState": "ready"
+    },
+    {
       "id": "manual-5-grade-479",
       "referenceId": "a128f4b441df5493",
       "grade": 5,
@@ -1718,10 +1731,36 @@
       "source": "manual-page-verification",
       "verification": "source-page-visual-check",
       "reviewState": "ready"
+    },
+    {
+      "id": "manual-5-grade-480-a",
+      "referenceId": "a128f4b441df5493",
+      "grade": 5,
+      "subject": "Математика",
+      "term": 2,
+      "topic": "Жай бөлшектерді ортақ бөлімге келтіру. Жай бөлшектерді және аралас сандарды салыстыру",
+      "exerciseNumber": "480",
+      "text": "480. 1) Бөлшектерді өсу ретімен жазыңдар: 9/10, 9/8, 9/7, 9/13, 9/2, 9/11, 9/9.",
+      "source": "manual-page-verification",
+      "verification": "source-page-visual-check",
+      "reviewState": "ready"
+    },
+    {
+      "id": "manual-5-grade-481",
+      "referenceId": "a128f4b441df5493",
+      "grade": 5,
+      "subject": "Математика",
+      "term": 2,
+      "topic": "Жай бөлшектерді ортақ бөлімге келтіру. Жай бөлшектерді және аралас сандарды салыстыру",
+      "exerciseNumber": "481",
+      "text": "481. Аралас сандарды салыстырып, нәтижесін тиісті «>» немесе «<» белгісімен жазыңдар: 1) 1 3/4 және 1 1/4; 2) 2 5/8 және 2 1/8; 3) 3 5/8 және 4 5/8; 4) 7 1/9 және 6 5/9; 5) 2 9/11 және 2 9/10; 6) 5 3/4 және 5 1/4.",
+      "source": "manual-page-verification",
+      "verification": "source-page-visual-check",
+      "reviewState": "ready"
     }
   ],
   "summary": {
-    "ready": 132,
+    "ready": 135,
     "rejected": 6,
     "manualReviewRequired": 0
   }
