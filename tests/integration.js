@@ -112,8 +112,8 @@ async function main() {
     assert.ok(generatedTermTwo.data.html.includes('/textbook-excerpts/task-'));
     assert.ok(!generatedTermTwo.data.html.includes('Оқулық үзіндісіндегі есепті немесе мысалды'));
     assert.ok(/№\d+(?:[.)]\d+)? есеп\.<\/strong>\s+[^<]{12,}/.test(generatedTermTwo.data.html));
-    assert.equal((generatedTermTwo.data.html.match(/<figure class="math-visual">/g) || []).length, 5);
-    assert.equal((generatedTermTwo.data.html.match(/есептің шешу жолы:/g) || []).length, 5);
+    assert.equal((generatedTermTwo.data.html.match(/<figure class="math-visual">/g) || []).length, 2);
+    assert.equal((generatedTermTwo.data.html.match(/есепті орындайды, жауабын жазады және тексереді/g) || []).length, 5);
     const excerptPath = generatedTermTwo.data.html.match(/\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg/)[0];
     const excerptResponse = await fetch(`http://127.0.0.1:${appPort}${excerptPath}`);
     assert.equal(excerptResponse.status, 200);
@@ -130,7 +130,7 @@ async function main() {
     assert.equal((generatedTermTwo.data.html.match(/Дескриптор —/g) || []).length, 6);
     assert.equal((generatedTermTwo.data.html.match(/class="task-values"/g) || []).length, 6);
     assert.ok(generatedTermTwo.data.html.includes('<strong>Құндылықтар:</strong>'));
-    assert.ok(generatedTermTwo.data.html.includes('шешу қадамдарын ретімен жазады және нәтижесін тексереді'));
+    assert.ok(!generatedTermTwo.data.html.includes('есептің шешу жолы:'));
     assert.equal((generatedTermTwo.data.html.match(/45 минут/g) || []).length, 1);
     assert.ok(generatedTermTwo.data.html.includes('ББҮ кестесін толтырады'));
     assert.ok(generatedTermTwo.data.html.includes('<table class="bbu-table">'));

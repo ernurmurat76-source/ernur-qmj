@@ -429,6 +429,7 @@ function normalizePlan(raw, body, reference = null) {
     tasks: (Array.isArray(stage?.tasks) ? stage.tasks : []).map((item, taskIndex) => ({
       number: Math.max(1, Math.round(Number(item?.number) || taskIndex + 1)),
       exerciseNumber: String(item?.exerciseNumber || '').trim(),
+      displayMode: item?.displayMode === 'image' ? 'image' : 'text',
       instruction: String(item?.instruction || '').trim(),
       descriptor: String(item?.descriptor || '').trim(),
       points: Math.max(1, Math.round(Number(item?.points) || 1)),
@@ -483,9 +484,10 @@ function renderPlan(body, plan, model, reference = null) {
   const displayStages = sourceStages.slice(0, 4).map((stage, index) => ({ ...stage, name: stageContract[index][0], minutes: stageContract[index][1] }));
   const rows = displayStages.map(stage => {
     const tasks = (stage.tasks || []).map(task => {
-      const taskVisual = task.visual ? `<figure class="math-visual"><img src="${escapeHtml(task.visual.src)}" alt="${escapeHtml(task.visual.alt)}"><figcaption>${escapeHtml(task.visual.caption || `№${task.exerciseNumber} есеп`)}</figcaption></figure>` : '';
+      const taskVisual = task.displayMode === 'image' && task.visual ? `<figure class="math-visual"><img src="${escapeHtml(task.visual.src)}" alt="${escapeHtml(task.visual.alt)}"><figcaption>${escapeHtml(task.visual.caption || `№${task.exerciseNumber} есеп`)}</figcaption></figure>` : '';
       const heading = task.exerciseNumber ? `№${escapeHtml(task.exerciseNumber)} есеп.` : `${task.number}-тапсырма.`;
-      return `<div class="lesson-task">${taskVisual}<p><strong>${heading}</strong> ${escapeHtml(task.instruction)}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p><p class="task-values"><strong>Құндылықтар:</strong> ${escapeHtml(taskValue)}</p></div>`;
+      const instruction = task.displayMode === 'image' ? '' : ` ${escapeHtml(task.instruction)}`;
+      return `<div class="lesson-task">${taskVisual}<p><strong>${heading}</strong>${instruction}</p><p class="task-descriptor"><strong>Дескриптор — ${task.points} балл:</strong><br>• ${escapeHtml(task.descriptor)} — ${task.points}</p><p class="task-values"><strong>Құндылықтар:</strong> ${escapeHtml(taskValue)}</p></div>`;
     }).join('');
     const visuals = (stage.visuals || []).map(item => `<figure class="math-visual"><img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"><figcaption>${escapeHtml(item.caption)}</figcaption></figure>`).join('');
     const teacher = `${list(stage.teacherActions)}${visuals}${tasks}`;
