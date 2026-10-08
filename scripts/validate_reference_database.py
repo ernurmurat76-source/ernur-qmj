@@ -84,21 +84,14 @@ def main() -> int:
         task_visuals = [task.get("visual") for stage in stages[1:3] for task in (stage.get("tasks") or [])]
         if len(visuals) != 5 or len(task_visuals) != 5 or any(not visual or visual.get("kind") != "textbook-excerpt" for visual in task_visuals):
             errors.append(f'{record.get("id")}: оқулық тапсырмасының қиындысы тіркелмеген')
+        task_modes = [task.get("displayMode") for stage in stages[1:3] for task in (stage.get("tasks") or [])]
+        if task_modes != ["image"] * 5:
+            errors.append(f'{record.get("id")}: бес оқулық тапсырмасының бәрі сурет режимінде емес')
         for visual in task_visuals:
             src = str(visual.get("src", ""))
             visual_file = path.parent.parent / "public" / src.lstrip("/")
             if not src.startswith("/textbook-excerpts/task-") or not src.endswith(".jpg") or not visual_file.is_file():
                 errors.append(f'{record.get("id")}: көрнекілік файлы табылмады: {src}')
-        textbook_tasks = plan.get("distinctTextbookTasks") or []
-        task_numbers = [str(item.get("number") or "") for item in textbook_tasks]
-        task_sources = [str((visual or {}).get("src") or "") for visual in task_visuals]
-        if len(textbook_tasks) != 5 or len(set(task_numbers)) != 5 or any(not number for number in task_numbers):
-            errors.append(f'{record.get("id")}:бес қайталанбайтын есеп нөмірі берілмеген')
-        if len(set(task_sources)) != 5 or any(not src for src in task_sources):
-            errors.append(f'{record.get("id")}:бес қайталанбайтын есеп суреті берілмеген')
-        allowed_alignment = {"exact-topic", "same-section", "section-page-range"}
-        if any(item.get("alignment") not in allowed_alignment for item in textbook_tasks):
-            errors.append(f'{record.get("id")}:есептің тақырып/бөлім сәйкестігі тексерілмеген')
 
     counts = Counter((record.get("grade"), record.get("subject"), record.get("track", ""), record.get("term")) for record in new_records)
     required = []

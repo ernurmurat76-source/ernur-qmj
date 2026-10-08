@@ -291,32 +291,36 @@ function imageDrawing(asset, relationshipId, drawingId) {
 
 async function collectWordImages(wrapper) {
   const assets = new Map();
-  const images = [...wrapper.querySelectorAll('img[src^="/visuals/"], img[src^="/textbook-excerpts/"]')];
+  const images = [...wrapper.querySelectorAll('.math-visual img, img[src^="/visuals/"], img[src^="/textbook-excerpts/"]')];
+  const failures = [];
   await Promise.all(images.map(async (img, index) => {
     try {
-      const response = await fetch(img.getAttribute('src'));
-      if (!response.ok) return;
-      const objectUrl = URL.createObjectURL(await response.blob());
-      try {
-        const source = new Image();
-        await new Promise((resolve, reject) => {
-          source.onload = resolve;
-          source.onerror = reject;
-          source.src = objectUrl;
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = 1200;
-        canvas.height = Math.max(240, Math.round(1200 * (source.naturalHeight || 520) / (source.naturalWidth || 900)));
-        const context = canvas.getContext('2d');
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(source, 0, 0, canvas.width, canvas.height);
-        assets.set(img, { base64: canvas.toDataURL('image/png').split(',')[1], width: canvas.width, height: canvas.height, relationshipId: `rIdImage${index + 1}`, fileName: `image${index + 1}.png`, drawingId: index + 1 });
-      } finally {
-        URL.revokeObjectURL(objectUrl);
+      const src = img.getAttribute('src');
+      const isSvg = /\.svg(?:\?|$)/i.test(src);
+      let base64;
+      let extension;
+      if (isSvg) {
+        base64 = await visualToPngBase64(src);
+        extension = 'png';
+      } else {
+        const response = await fetch(src, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        let binary = '';
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        }
+        base64 = btoa(binary);
+        extension = /\.png(?:\?|$)/i.test(src) ? 'png' : 'jpg';
       }
-    } catch { /* Сурет болмаса, қалған ҚМЖ Word-қа сақталады. */ }
+      const width = img.naturalWidth || 1200;
+      const height = img.naturalHeight || 680;
+      assets.set(img, { base64, width, height, relationshipId: `rIdImage${index + 1}`, fileName: `image${index + 1}.${extension}`, drawingId: index + 1 });
+    } catch (error) {
+      failures.push(img.getAttribute('src') || `image-${index + 1}`);
+    }
   }));
+  if (failures.length) throw new Error(`Word құжатына ${failures.length} сурет ендірілмеді. Бетті жаңартып, қайта жүктеңіз`);
   return assets;
 }
 
@@ -379,7 +383,7 @@ async function buildGeneratedDocx(wrapper) {
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="425" w:right="652" w:bottom="425" w:left="652" w:header="0" w:footer="0" w:gutter="0"/><w:cols w:space="0"/><w:docGrid w:linePitch="240"/></w:sectPr></w:body></w:document>`;
   const imageRelationships = [...assets.values()].map(asset => `<Relationship Id="${asset.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${asset.fileName}"/>`).join('');
   const zip = new JSZip();
-  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
   zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
   zip.file('word/document.xml', documentXml);
   zip.file('word/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="20" w:line="220" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`);
@@ -407,7 +411,8 @@ async function downloadWord() {
   link.href = URL.createObjectURL(blob);
   link.download = `ҚМЖ-${topic.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.docx`;
   link.click();
-  URL.revokeObjectURL(link.href);
+  const downloadUrl = link.href;
+  setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000);
 }
 
 $('#qmjForm').addEventListener('submit', generate);

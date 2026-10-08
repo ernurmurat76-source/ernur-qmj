@@ -74,7 +74,20 @@ function table(className, rows) {
   });
   collectWordImages = async () => assets;
   const blob = await buildGeneratedDocx(documentRoot);
-  const output = process.argv[2] || path.join(root, 'qa-v28-five-tasks.docx');
-  fs.writeFileSync(output, Buffer.from(await blob.arrayBuffer()));
+  const output = process.argv[2] || path.join(root, 'qa-v30-term2-images.docx');
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  const zip = await JSZip.loadAsync(buffer);
+  const relationships = await zip.file('word/_rels/document.xml.rels').async('string');
+  const contentTypes = await zip.file('[Content_Types].xml').async('string');
+  const documentXml = await zip.file('word/document.xml').async('string');
+  if (!imageTasks.length) throw new Error('Term 2 image tasks were not found');
+  if ((relationships.match(/relationships\/image/g) || []).length !== imageTasks.length) throw new Error('DOCX image relationships are incomplete');
+  if ((documentXml.match(/<w:drawing>/g) || []).length !== imageTasks.length) throw new Error('DOCX image drawings are incomplete');
+  if (!contentTypes.includes('Extension="jpg" ContentType="image/jpeg"')) throw new Error('DOCX JPEG content type is missing');
+  for (let index = 0; index < imageTasks.length; index += 1) {
+    const media = zip.file(`word/media/image${index + 1}.jpg`);
+    if (!media || (await media.async('uint8array')).length < 1000) throw new Error(`Embedded image ${index + 1} is missing`);
+  }
+  fs.writeFileSync(output, buffer);
   console.log(output);
 })().catch(error => { console.error(error); process.exit(1); });
