@@ -291,7 +291,7 @@ function imageDrawing(asset, relationshipId, drawingId) {
 
 async function collectWordImages(wrapper) {
   const assets = new Map();
-  const images = [...wrapper.querySelectorAll('.math-visual img, img[src^="/visuals/"], img[src^="/textbook-excerpts/"]')];
+  const images = [...wrapper.querySelectorAll('.math-visual img, img[src^="/visuals/"], img[src^="/textbook-excerpts/"], img[src^="/history-excerpts/"]')];
   const failures = [];
   await Promise.all(images.map(async (img, index) => {
     try {

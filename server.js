@@ -11,7 +11,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const REFERENCE_PATH = path.join(__dirname, 'data', 'qmj-reference-index.json');
 const REFERENCE_DOCX_DIR = path.join(__dirname, 'data', 'reference-docx');
 const SUBJECTS = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'subjects.json'), 'utf8'));
-const AI_FREE_SUBJECTS = new Set(['Математика', 'Алгебра', 'Геометрия']);
+const SOCIAL_SUBJECTS = new Set(['Қазақстан тарихы', 'Дүниежүзі тарихы', 'Құқық негіздері']);
+const AI_FREE_SUBJECTS = new Set(['Математика', 'Алгебра', 'Геометрия', ...SOCIAL_SUBJECTS]);
 const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openrouter').toLowerCase();
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
@@ -284,6 +285,7 @@ function distributeMinutes(stages) {
 function planFromReference(reference, body) {
   if (!reference) return demoPlan(body);
   if (reference.prepared_plan) return normalizePlan(reference.prepared_plan, body, null);
+  if (SOCIAL_SUBJECTS.has(body.subject)) return socialStudiesPlan(body, reference);
   const usable = reference.stages.filter(stage => stage.teacher || stage.learner);
   if (!usable.length) return curriculumPlan(body, reference);
   const organization = usable[0];
@@ -334,6 +336,77 @@ function planFromReference(reference, body) {
     stages,
     differentiation: 'Қолдауды қажет ететін оқушыға үлгі мен кезеңдік нұсқаулық беріледі; дайын оқушыға дәлелдеуді қажет ететін күрделендірілген тапсырма ұсынылады.',
     safety: 'Сыныптағы қауіпсіздік және цифрлық құралдарды дұрыс пайдалану талаптары сақталады.'
+  };
+}
+
+function socialStudiesPlan(body, reference) {
+  const isLaw = body.subject === 'Құқық негіздері';
+  const topic = String(body.topic || reference?.topic || '').trim();
+  const objective = String(body.objective || reference?.objectives || '').trim();
+  const researchQuestion = topic.match(/Зерттеу сұрағы:\s*(.+)$/i)?.[1] || topic;
+  const lessonObjectives = splitText(objective, [`${topic} тақырыбы бойынша негізгі мазмұнды түсіндіру`]).slice(0, 4);
+  const textbookVisual = reference?.textbook_task?.visual ? {
+    src: reference.textbook_task.visual,
+    alt: `${topic} тақырыбына арналған оқулық тапсырмасы`,
+    caption: 'Оқулықтағы тапсырма'
+  } : null;
+  const task = (number, instruction, descriptor, points = 1, visual = null) => ({
+    number, instruction, descriptor, points,
+    displayMode: visual ? 'image' : 'text', visual
+  });
+  const sourceWord = isLaw ? 'құқықтық норма мен жағдаятты' : 'тарихи дерек пен оқулық мәтінін';
+  return {
+    lessonObjectives,
+    assessmentCriteria: isLaw
+      ? ['құқықтық ұғым мен норманы жағдаятта қолданады', 'қорытындысын құқықтық дәлелмен негіздейді']
+      : ['оқиға немесе үдерістің себептері мен салдарын анықтайды', 'тарихи қорытындысын нақты дерекпен негіздейді'],
+    stages: [
+      {
+        name: 'Ұйымдастыру кезеңі', minutes: 5, method: 'Сабаққа дайындық', workForm: 'Бүкіл сыныппен жұмыс',
+        teacherActions: ['Сәлемдесу.', 'Сыныптағы оқушылардың көңіл күйлерін сұрап, жағымды ахуал туындату.', 'Оқушыларды түгелдеу.', 'Сабақтың мақсатымен таныстыру.'],
+        learnerActions: ['Сабаққа дайындалады және оқу құралдарын реттейді.'], tasks: [], descriptors: [],
+        feedback: 'Ауызша бағалау: «Өте жақсы», «Жарайсың».', resources: ['Оқу құралдары'], support: ''
+      },
+      {
+        name: 'Сабақтың басы', minutes: 10, method: 'Бастапқы болжам', workForm: 'Жеке жұмыс',
+        teacherActions: ['Тақырып пен зерттеу сұрағын көрсетіп, бастапқы ойды анықтайтын тапсырма береді.'],
+        learnerActions: ['Алдыңғы білімін қолданып, бастапқы болжамын жазады.'], descriptors: [],
+        tasks: [task(1, isLaw
+          ? `«${topic}» тақырыбы бойынша негізгі құқықтық ұғымды анықтап, оның қоғамдағы маңызын бір мысалмен түсіндіріңдер.`
+          : `«${researchQuestion}» сұрағына бастапқы жауап жазыңдар. Жауапта кезеңді, орынды және бір негізгі ұғымды көрсетіңдер.`,
+          isLaw ? 'құқықтық ұғымды дұрыс анықтап, маңызын нақты мысалмен түсіндіреді' : 'бастапқы пікірінде кезеңді, орынды және негізгі ұғымды дұрыс көрсетеді', 2)],
+        feedback: 'Нақтылаушы сұрақ арқылы бастапқы жауап толықтырылады.', resources: ['Тақта', 'Оқулық'], support: 'Негізгі ұғымдар мен сөйлем бастамалары беріледі.'
+      },
+      {
+        name: 'Сабақтың ортасы', minutes: 25, method: isLaw ? 'Құқықтық жағдаятты талдау' : 'Дерек–дәлел–қорытынды', workForm: 'Жеке және жұптық жұмыс',
+        teacherActions: [`${sourceWord} талдауға арналған төрт тапсырманы ретімен ұсынады.`, 'Жауаптың дерекке сүйенуін тексеріп, дәлелді нақтылауға бағыттайды.'],
+        learnerActions: ['Оқулық мәтіні мен берілген деректерді талдайды.', 'Жауабын жұбымен салыстырып, дәлелін толықтырады.', 'Жеке қорытынды жазады.'], descriptors: [],
+        tasks: isLaw ? [
+          task(1, textbookVisual ? 'Оқулық үзіндісіндегі тапсырмаларды орындаңдар.' : `Оқулықтағы «${topic}» бөлігін оқып, үш негізгі құқықтық ұғымды және олардың анықтамасын кестеге жазыңдар.`, 'оқулық тапсырмасындағы құқықтық ұғымдар мен нормаларды дұрыс қолданып, жауабын негіздейді', 2, textbookVisual),
+          task(2, `«${topic}» тақырыбына байланысты құқықтық жағдаят құрастырып, қатысушыларды, құқықтары мен міндеттерін анықтаңдар.`, 'жағдаяттағы тараптарды, олардың құқықтары мен міндеттерін ажыратады', 2),
+          task(3, `Жағдаятты оқу мақсатына сәйкес құқықтық нормамен байланыстырып, қандай әрекет заңды немесе заңсыз екенін түсіндіріңдер.`, 'құқықтық норманы жағдаятқа дұрыс қолданып, шешімін негіздейді', 2),
+          task(4, `Мәселені шешудің заңды жолын ұсыныңдар және оның ықтимал салдарын екі дәлелмен бағалаңдар.`, 'заңды шешу жолын ұсынып, ықтимал салдарын екі дәлелмен бағалайды', 2)
+        ] : [
+          task(1, textbookVisual ? 'Оқулық үзіндісіндегі тапсырмаларды орындаңдар.' : `Оқулықтағы «${topic}» тақырыбына қатысты мәтінді оқып, үш негізгі фактіні «уақыт – оқиға – нәтиже» кестесіне түсіріңдер.`, 'оқулық тапсырмасын орындап, жауабын тақырыпқа қатысты нақты тарихи дерекпен негіздейді', 2, textbookVisual),
+          task(2, `Тақырыпқа қатысты бір тарихи деректі «авторы/жасалған уақыты – негізгі ойы – мақсаты – құндылығы» тармақтары бойынша талдаңдар.`, 'тарихи деректің авторын немесе уақытын, негізгі ойын, мақсаты мен құндылығын анықтайды', 2),
+          task(3, `«${researchQuestion}» сұрағына жауап беру үшін оқиғаның кемінде екі себебі мен екі салдарын анықтап, олардың байланысын түсіндіріңдер.`, 'екі себеп пен екі салдарды анықтап, олардың өзара байланысын түсіндіреді', 2),
+          task(4, `Тақырыптағы оқиға, үдеріс немесе тұлғаның тарихи маңызын екі нақты дерекпен бағалап, дәлелді қорытынды жазыңдар.`, 'тарихи маңызын екі нақты дерекпен бағалап, дәлелді қорытынды жасайды', 2)
+        ],
+        feedback: 'Дескриптор бойынша дәлелдің нақтылығы көрсетіліп, оқушы жауабын толықтырады.', resources: ['Оқулық', isLaw ? 'Құқықтық жағдаят кестесі' : 'Тарихи дерек', 'Тапсырма парағы'], support: 'Талдау кестесі, тірек ұғымдар және сөйлем бастамалары беріледі.'
+      },
+      {
+        name: 'Сабақтың соңы', minutes: 5, method: 'Дәлелді қорытынды', workForm: 'Жеке жұмыс',
+        teacherActions: ['Оқу мақсатына сай қысқа қорытынды тапсырма береді.', 'ББҮ кестесі арқылы сабақ нәтижесін қорытындылауды ұйымдастырады.'],
+        learnerActions: ['Қорытынды жауабын жазады.', 'ББҮ кестесін толтырады: «Білемін», «Білгім келеді», «Үйрендім».'], descriptors: [],
+        tasks: [task(1, isLaw
+          ? `«${topic}» тақырыбы бойынша құқықтық шешімді бір тұжырым және екі дәлелмен қорытындылаңдар.`
+          : `«${researchQuestion}» сұрағына бір тұжырым және екі нақты тарихи дәлелмен қорытынды жауап жазыңдар.`,
+          isLaw ? 'құқықтық қорытындыны бір тұжырым және екі дәлелмен негіздейді' : 'зерттеу сұрағына бір тұжырым және екі тарихи дәлелмен жауап береді', 2)],
+        feedback: 'Қорытынды жауаптың оқу мақсаты мен дәлелге сәйкестігі бойынша кері байланыс беріледі.', resources: ['ББҮ кестесі'], support: 'Қорытындыға арналған сөйлем құрылымы беріледі.'
+      }
+    ],
+    differentiation: 'Қолдауды қажет ететін оқушыға тірек ұғымдар, талдау кестесі және сөйлем бастамалары беріледі; дайын оқушы деректердің сенімділігін салыстырып бағалайды.',
+    safety: 'Сыныптағы қауіпсіздік және цифрлық деректермен жауапты жұмыс істеу талаптары сақталады.'
   };
 }
 
@@ -433,14 +506,14 @@ function normalizePlan(raw, body, reference = null) {
       instruction: String(item?.instruction || '').trim(),
       descriptor: String(item?.descriptor || '').trim(),
       points: Math.max(1, Math.round(Number(item?.points) || 1)),
-      visual: item?.visual && /^(?:\/visuals\/[a-z0-9-]+\.svg|\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item.visual.src || '')) ? {
+      visual: item?.visual && /^(?:\/visuals\/[a-z0-9-]+\.svg|\/(?:textbook|history)-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item.visual.src || '')) ? {
         src: String(item.visual.src),
         alt: String(item.visual.alt || 'Оқулықтағы есеп').trim(),
         caption: String(item.visual.caption || '').trim()
       } : null
     })).filter(item => item.instruction && item.descriptor),
     visuals: (Array.isArray(stage?.visuals) ? stage.visuals : []).map(item => ({
-      src: /^(?:\/visuals\/[a-z0-9-]+\.svg|\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item?.src || '')) ? String(item.src) : '',
+      src: /^(?:\/visuals\/[a-z0-9-]+\.svg|\/(?:textbook|history)-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item?.src || '')) ? String(item.src) : '',
       alt: String(item?.alt || 'Математикалық сызба').trim(),
       caption: String(item?.caption || '').trim()
     })).filter(item => item.src).slice(0, 2),
@@ -457,7 +530,7 @@ function normalizePlan(raw, body, reference = null) {
     differentiation: String(raw?.differentiation || fallback.differentiation).trim(),
     safety: String(raw?.safety || fallback.safety).trim(),
     visuals: (Array.isArray(raw?.visuals) ? raw.visuals : []).map(item => ({
-      src: /^(?:\/visuals\/[a-z0-9-]+\.svg|\/textbook-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item?.src || '')) ? String(item.src) : '',
+      src: /^(?:\/visuals\/[a-z0-9-]+\.svg|\/(?:textbook|history)-excerpts\/task-[a-f0-9]{20}\.jpg)$/i.test(String(item?.src || '')) ? String(item.src) : '',
       alt: String(item?.alt || 'Математикалық сызба').trim(),
       caption: String(item?.caption || '').trim()
     })).filter(item => item.src).slice(0, 2),
@@ -470,8 +543,13 @@ function normalizePlan(raw, body, reference = null) {
 function renderPlan(body, plan, model, reference = null) {
   const list = items => `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
   const valueName = String(reference?.values || 'Еңбекқорлық және кәсіби біліктілік').trim();
-  const valueExplanation = `${valueName}. Тапсырмаларды мұқият орындап, шешу ретін сақтайды; дәл есептеп, жауабын математикалық тілде негіздейді.`;
-  const taskValue = `${valueName} — есепті жауапкершілікпен орындап, шешу қадамдарын ретімен жазады және нәтижесін тексереді.`;
+  const socialSubject = SOCIAL_SUBJECTS.has(body.subject);
+  const valueExplanation = socialSubject
+    ? `${valueName}. Дерек пен пікірді ажыратып, тапсырманы жауапкершілікпен орындайды; қорытындысын нақты дәлелмен негіздейді.`
+    : `${valueName}. Тапсырмаларды мұқият орындап, шешу ретін сақтайды; дәл есептеп, жауабын математикалық тілде негіздейді.`;
+  const taskValue = socialSubject
+    ? `${valueName} — деректі жауапкершілікпен талдап, өз тұжырымын нақты дәлелмен негіздейді.`
+    : `${valueName} — есепті жауапкершілікпен орындап, шешу қадамдарын ретімен жазады және нәтижесін тексереді.`;
   const organizationStage = {
     name: 'Ұйымдастыру кезеңі', minutes: 5, teacherActions: ['Сәлемдесу.', 'Сыныптағы оқушылардың көңіл күйлерін сұрап, жағымды ахуал туындату.', 'Оқушыларды түгелдеу.', 'Сабақтың мақсатымен таныстыру.'],
     learnerActions: ['Сабаққа дайындалады және оқу құралдарын реттейді.'], tasks: [], descriptors: [],
@@ -512,7 +590,10 @@ function apiConfig() {
 async function generatePlan(body) {
   const reference = selectReference(body);
   if (AI_FREE_SUBJECTS.has(body.subject)) {
-    return renderPlan(body, planFromReference(reference, body), 'Атамұра ҚМЖ базасы · ЖИ қолданылмады', reference);
+    const model = SOCIAL_SUBJECTS.has(body.subject)
+      ? 'КТЖ тарих/құқық базасы · ЖИ қолданылмады'
+      : 'Атамұра ҚМЖ базасы · ЖИ қолданылмады';
+    return renderPlan(body, planFromReference(reference, body), model, reference);
   }
   if (reference?.prepared_plan) return renderPlan(body, planFromReference(reference, body), 'Дайын ҚМЖ базасы · ЖИ қолданылмады', reference);
   if (reference?.stages?.length) return renderPlan(body, planFromReference(reference, body), 'Дайын ҚМЖ', reference);

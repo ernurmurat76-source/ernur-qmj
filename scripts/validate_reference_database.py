@@ -108,6 +108,34 @@ def main() -> int:
         if not counts[key]:
             errors.append(f"Қамтылмаған топ: {key}")
 
+    history_records = [record for record in records if record.get("source", {}).get("status") == "teacher-provided-history-ktz"]
+    history_counts = Counter((record.get("grade"), record.get("subject"), record.get("track", ""), record.get("term")) for record in history_records)
+    for record in history_records:
+        if record.get("grade") not in range(5, 12) or record.get("term") not in {1, 2, 3, 4}:
+            errors.append(f'{record.get("id")}: тарих/құқық сыныбы немесе тоқсаны қате')
+        if record.get("subject") not in {"Қазақстан тарихы", "Дүниежүзі тарихы", "Құқық негіздері"}:
+            errors.append(f'{record.get("id")}: тарих/құқық пәні қате')
+        if not record.get("section") or not record.get("topic") or not record.get("objectives"):
+            errors.append(f'{record.get("id")}: тарих/құқық бөлімі, тақырыбы немесе мақсаты жоқ')
+    for grade in range(5, 10):
+        for subject in ("Қазақстан тарихы", "Дүниежүзі тарихы"):
+            for term in (1, 2, 3, 4):
+                if not history_counts[(grade, subject, "", term)]:
+                    errors.append(f"Қамтылмаған тарих тобы: {(grade, subject, '', term)}")
+    for term in (1, 2, 3, 4):
+        if not history_counts[(10, "Қазақстан тарихы", "", term)]:
+            errors.append(f"Қамтылмаған тарих тобы: {(10, 'Қазақстан тарихы', '', term)}")
+        if not history_counts[(9, "Құқық негіздері", "", term)]:
+            errors.append(f"Қамтылмаған құқық тобы: {(9, 'Құқық негіздері', '', term)}")
+        for grade in (10, 11):
+            for subject in ("Дүниежүзі тарихы", "Құқық негіздері"):
+                for track in ("ЖМБ", "ҚГБ"):
+                    if not history_counts[(grade, subject, track, term)]:
+                        errors.append(f"Қамтылмаған тарих/құқық тобы: {(grade, subject, track, term)}")
+        for track in ("ЖМБ", "ҚГБ"):
+            if not history_counts[(11, "Қазақстан тарихы", track, term)]:
+                errors.append(f"Қамтылмаған тарих тобы: {(11, 'Қазақстан тарихы', track, term)}")
+
     summary = {
         "records": len(records),
         "new_ktz_records": len(new_records),
@@ -118,6 +146,8 @@ def main() -> int:
         "textbook_excerpt_embedded": sum(bool(record.get("prepared_plan", {}).get("visuals")) for record in new_records),
         "written_textbook_tasks": sum("written_textbook_task" in (record.get("quality_flags") or []) for record in new_records),
         "covered_groups": len(counts),
+        "history_law_records": len(history_records),
+        "history_law_groups": len(history_counts),
         "errors": errors,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
