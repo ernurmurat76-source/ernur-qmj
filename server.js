@@ -671,6 +671,36 @@ async function generatePlan(body) {
   }
 }
 
+const TEXT_TOOL_MODES = new Set(['assistant', 'essay', 'article', 'report', 'author-program', 'worksheet', 'riddle']);
+
+async function generateTextTool(body) {
+  const mode = String(body.mode || 'assistant');
+  if (!TEXT_TOOL_MODES.has(mode)) throw Object.assign(new Error('Құрал түрі қате'), { status: 400 });
+  const prompt = String(body.prompt || '').trim();
+  if (prompt.length < 3 || prompt.length > 5000) throw Object.assign(new Error('Тапсырманы 3–5000 таңба аралығында жазыңыз'), { status: 400 });
+  const config = apiConfig();
+  if (!config.key) throw Object.assign(new Error('Е-Көмекші үшін ЖИ кілті серверде орнатылмаған'), { status: 503 });
+  const labels = {
+    assistant: 'мұғалімнің сұрағына нақты әдістемелік жауап',
+    essay: 'құрылымды эссе',
+    article: 'тақырыпшалары бар мақала',
+    report: 'ресми баяндама',
+    'author-program': 'авторлық бағдарламаның мазмұны мен құрылымы',
+    worksheet: 'оқушыға арналған жұмыс парағы',
+    riddle: 'оқу тақырыбына сай жұмбақтар мен қысқа тапсырмалар'
+  };
+  const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. ${labels[mode]} дайында. Мәтін қазақ тілінде, сауатты, түсінікті және мұғалім бірден қолданатындай болсын. Пайдаланушы бермеген оқу мақсатын немесе ресми деректі ойдан қоспа. Қажет болса тақырыпшалар мен нөмірленген тізім қолдан. Markdown кестесін қолданба. Тек дайын материалды қайтар.`;
+  const user = `Құрал: ${labels[mode]}\nПән: ${String(body.subject || 'көрсетілмеген')}\nСынып: ${String(body.grade || 'көрсетілмеген')}\nТақырып/сұраныс: ${prompt}\nҚосымша талап: ${String(body.requirements || 'жоқ')}`;
+  const headers = { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' };
+  if (AI_PROVIDER !== 'openai') Object.assign(headers, { 'HTTP-Referer': process.env.PUBLIC_URL || `http://localhost:${PORT}`, 'X-Title': 'e-tarih' });
+  const response = await fetch(config.url, { method: 'POST', headers, body: JSON.stringify({ model: AI_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: mode === 'assistant' ? 0.25 : 0.55, max_tokens: 3500 }) });
+  const result = await response.json();
+  if (!response.ok) throw Object.assign(new Error(result?.error?.message || 'ЖИ қызметі уақытша қолжетімсіз'), { status: 502 });
+  const content = String(result?.choices?.[0]?.message?.content || '').replace(/^```(?:text|markdown)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  if (!content) throw Object.assign(new Error('ЖИ бос жауап берді'), { status: 502 });
+  return { content, model: result.model || AI_MODEL, title: String(body.title || prompt).slice(0, 120) };
+}
+
 async function handleApi(req, res, pathname) {
   try {
     const referenceDocxMatch = pathname.match(/^\/api\/reference-docx\/([0-9a-f]{16})$/i);
@@ -710,6 +740,13 @@ async function handleApi(req, res, pathname) {
       const result = await verifyAccessCode(requestAccessCode(req, body), false, requestDeviceId(req));
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
       return sendJson(res, 200, { ok: true, expiresAt: result.record.expires_at, days: result.record.duration_days, allowedSubjects: normalizeAllowedSubjects(result.record.allowed_subjects) });
+    }
+    if (req.method === 'POST' && pathname === '/api/tools/text') {
+      const body = await readJson(req);
+      const access = await verifyAccessCode(requestAccessCode(req, body), true, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
+      if (body.subject && !codeAllowsSubject(access.record, body.subject)) return sendJson(res, 403, { error: `Бұл код «${body.subject}» пәніне рұқсат бермейді`, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
+      return sendJson(res, 200, await generateTextTool(body));
     }
     if (req.method === 'POST' && pathname === '/api/account/register') {
       const body = await readJson(req);
