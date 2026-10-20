@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#246bfd">
+  <meta name="description" content="Е-Тарих мұғалімінің жеке кабинеті">
+  <title>Жеке кабинет — Е-Тарих</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="account-page">
+  <header class="header">
+    <a class="brand" href="/"><span>ЕТ</span><strong>Е-Тарих</strong></a>
+    <nav><a href="/">Басты бет</a><a href="/#builder">ҚМЖ жасау</a><a href="/account.html">Жеке кабинет</a></nav>
+    <a class="header-button" href="/#builder">+ ҚМЖ жасау</a>
+  </header>
+
+  <main class="account-main">
+    <section class="account-auth" id="authPanel">
+      <div class="account-intro">
+        <span class="badge">Мұғалімнің жеке кеңістігі</span>
+        <h1>Құжаттарыңыз әрдайым қолыңызда</h1>
+        <p>ҚМЖ құрастырыңыз, сақтаңыз және телефоннан немесе компьютерден қайта жүктеңіз.</p>
+        <ul><li>Бір телефон және бір компьютер</li><li>Дайын ҚМЖ автоматты сақталады</li><li>Жазылым мерзімі мен пәндер көрінеді</li></ul>
+      </div>
+      <div class="account-card">
+        <div class="auth-tabs" role="tablist">
+          <button class="active" id="loginTab" type="button">Кіру</button>
+          <button id="registerTab" type="button">Тіркелу</button>
+        </div>
+        <form id="loginForm" class="account-form">
+          <div><span class="account-kicker">Қайта келгеніңізге қуаныштымыз</span><h2>Жеке кабинетке кіру</h2></div>
+          <label>E-mail<input id="loginEmail" type="email" autocomplete="email" required placeholder="teacher@example.kz"></label>
+          <label>Құпиясөз<input id="loginPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="Кемінде 8 таңба"></label>
+          <button class="generate" type="submit">Кіру</button>
+          <p class="error" id="loginError"></p>
+        </form>
+        <form id="registerForm" class="account-form hidden">
+          <div><span class="account-kicker">Алғашқы рет кіріп тұрсыз ба?</span><h2>Мұғалім аккаунтын ашу</h2></div>
+          <label>Аты-жөніңіз<input id="registerName" autocomplete="name" required placeholder="Мұрат Ернұр Мырзағалиұлы"></label>
+          <label>E-mail<input id="registerEmail" type="email" autocomplete="email" required placeholder="teacher@example.kz"></label>
+          <div class="grid two"><label>Мектеп<input id="registerSchool" placeholder="Мектеп атауы"></label><label>Негізгі пән<input id="registerSubject" placeholder="Қазақстан тарихы"></label></div>
+          <label>Әкімші берген кіру коды<input id="registerCode" autocomplete="off" required placeholder="ERNUR-XXXXX-XXXXX"></label>
+          <label>Жаңа құпиясөз<input id="registerPassword" type="password" autocomplete="new-password" required minlength="8" placeholder="Кемінде 8 таңба"></label>
+          <button class="generate" type="submit">Аккаунт ашу</button>
+          <p class="error" id="registerError"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="teacher-dashboard hidden" id="dashboard">
+      <div class="dashboard-welcome">
+        <div><span class="badge">Жеке кабинет</span><h1 id="welcomeName">Қош келдіңіз!</h1><p id="profileSummary"></p></div>
+        <div class="dashboard-actions"><a class="primary" href="/#builder">+ ҚМЖ жасау</a><button id="logoutButton" type="button">Шығу</button></div>
+      </div>
+      <div class="teacher-stats">
+        <article><span>Сақталған құжат</span><strong id="documentCount">0</strong></article>
+        <article><span>Қолжетімді пәндер</span><strong id="subjectCount">0</strong></article>
+        <article class="wide"><span>Жазылым мерзімі</span><strong id="accountExpiry">—</strong></article>
+      </div>
+      <div class="teacher-grid">
+        <section class="panel-card">
+          <span class="account-kicker">Профиль</span><h2>Мұғалім туралы</h2>
+          <form id="profileForm" class="account-form compact">
+            <label>Аты-жөні<input id="profileName" required></label>
+            <label>Мектеп<input id="profileSchool"></label>
+            <label>Негізгі пән<input id="profileSubject"></label>
+            <label>Телефон<input id="profilePhone" inputmode="tel"></label>
+            <button class="generate" type="submit">Өзгерісті сақтау</button>
+            <p class="error" id="profileError"></p>
+          </form>
+        </section>
+        <section class="panel-card documents-panel">
+          <div class="documents-heading"><div><span class="account-kicker">Менің материалдарым</span><h2>Сақталған ҚМЖ</h2></div><button id="refreshDocuments" type="button">Жаңарту</button></div>
+          <div class="documents-list" id="documentsList"><p class="documents-empty">Құжаттар жүктеліп жатыр...</p></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <nav class="mobile-nav" aria-label="Негізгі мәзір"><a href="/">Басты бет</a><a href="/#builder">ҚМЖ жасау</a><a class="active" href="/account.html">Кабинет</a></nav>
+  <div class="toast hidden" id="toast"></div>
+  <script src="/account.js" defer></script>
+</body>
+</html>
