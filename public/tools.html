@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#246bfd">
+  <meta name="description" content="Е-Тарих мұғалім құралдары">
+  <title>Құралдар — Е-Тарих</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .tools-page{min-height:100vh;background:#f5f8fd}.tools-main{padding:55px max(5vw,18px) 100px}.tools-heading{max-width:1200px;margin:0 auto 30px}.tools-heading h1{font-size:clamp(35px,5vw,58px);letter-spacing:-.045em;margin:10px 0}.tools-heading p{max-width:720px;color:var(--muted);font-size:17px;line-height:1.65}.tool-filters{display:flex;flex-wrap:wrap;gap:8px;max-width:1200px;margin:0 auto 20px}.tool-filters button{border:1px solid var(--line);border-radius:99px;padding:9px 14px;background:#fff;color:#566278;font-weight:800}.tool-filters button.active{border-color:var(--blue);background:var(--blue);color:#fff}.platform-tools{max-width:1200px;margin:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.platform-tool{display:flex;flex-direction:column;min-height:235px;padding:22px;border:1px solid var(--line);border-radius:17px;background:#fff;box-shadow:0 7px 26px rgba(31,48,91,.055);transition:.2s ease}.platform-tool:hover{transform:translateY(-2px);border-color:#b8c9ed;box-shadow:0 13px 34px rgba(31,48,91,.1)}.tool-top{display:flex;justify-content:space-between;gap:12px}.tool-icon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:#edf3ff;font-size:23px}.tool-status{align-self:flex-start;border-radius:99px;padding:5px 8px;background:#eef1f6;color:#69758c;font-size:10px;font-weight:900}.tool-status.live{background:#e4f8f0;color:#11835f}.tool-status.next{background:#edf3ff;color:#2b5dc3}.platform-tool h2{font-size:19px;margin:16px 0 7px}.platform-tool p{flex:1;color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 17px}.tool-action{display:inline-flex;align-items:center;justify-content:center;border:1px solid #cbd8f2;border-radius:9px;padding:10px 12px;background:#fff;color:var(--blue);font-weight:850}.platform-tool.live-card .tool-action{border-color:var(--blue);background:var(--blue);color:#fff}.tool-empty{display:none;text-align:center;color:var(--muted);padding:60px}.tools-toast{position:fixed;right:24px;bottom:24px;z-index:60;padding:13px 18px;border-radius:11px;background:var(--navy);color:#fff;box-shadow:var(--shadow)}
+    @media(max-width:950px){.platform-tools{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:650px){body{padding-bottom:66px}.tools-main{padding:34px 13px 85px}.tools-heading h1{font-size:36px}.tools-heading p{font-size:15px}.tool-filters{overflow:auto;flex-wrap:nowrap;padding-bottom:4px}.tool-filters button{white-space:nowrap}.platform-tools{grid-template-columns:1fr}.platform-tool{min-height:210px}.tools-page .header-button{display:none}}
+  </style>
+</head>
+<body class="tools-page">
+  <header class="header">
+    <a class="brand" href="/"><span>ЕТ</span><strong>Е-Тарих</strong></a>
+    <nav><a href="/">Басты бет</a><a href="/tools.html">Құралдар</a><a href="/#builder">ҚМЖ жасау</a><a href="/account.html">Жеке кабинет</a></nav>
+    <a class="header-button" href="/account.html">Менің кабинетім</a>
+  </header>
+  <main class="tools-main">
+    <section class="tools-heading"><span class="badge">Е-Тарих платформасы</span><h1>Мұғалімнің цифрлық құралдары</h1><p>Қажетті құралды таңдаңыз. Дайын материалдар жеке кабинетке сақталып, Word немесе PowerPoint форматында жүктеледі.</p></section>
+    <div class="tool-filters" aria-label="Құрал санаттары"><button class="active" data-filter="all">Барлығы</button><button data-filter="plan">Жоспарлау</button><button data-filter="assessment">Бағалау</button><button data-filter="lesson">Сабақ</button><button data-filter="interactive">Интерактив</button><button data-filter="growth">Даму</button></div>
+    <section class="platform-tools" id="toolGrid">
+      <article class="platform-tool live-card" data-category="plan"><div class="tool-top"><div class="tool-icon">📘</div><span class="tool-status live">ЖҰМЫС ІСТЕЙДІ</span></div><h2>ҚМЖ жасау</h2><p>№130 нысанындағы 45 минуттық сабақ жоспары, тапсырмалар, дескрипторлар және Word.</p><a class="tool-action" href="/#builder">ҚМЖ жасау</a></article>
+      <article class="platform-tool" data-category="plan"><div class="tool-top"><div class="tool-icon">📅</div><span class="tool-status next">ӘЗІРЛЕНУДЕ</span></div><h2>КТЖ жасау</h2><p>Пән, сынып, апталық сағат және оқу бағдарламасы бойынша жылдық жоспар.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="assessment"><div class="tool-top"><div class="tool-icon">✅</div><span class="tool-status next">ӘЗІРЛЕНУДЕ</span></div><h2>БЖБ / ТЖБ</h2><p>Тапсырма, дескриптор, балл, жауап кілті және баспаға дайын Word.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool live-card" data-category="lesson"><div class="tool-top"><div class="tool-icon">✨</div><span class="tool-status live">ЖҰМЫС ІСТЕЙДІ</span></div><h2>Е-Көмекші</h2><p>Мұғалімнің сұрағына жауап береді, мәтін мен формуланы Word-қа дайындайды.</p><a class="tool-action" href="/text-tools.html?mode=assistant">Ашу</a></article>
+      <article class="platform-tool" data-category="lesson"><div class="tool-top"><div class="tool-icon">📊</div><span class="tool-status next">ӘЗІРЛЕНУДЕ</span></div><h2>Презентация</h2><p>Тақырыпқа сай дайын слайдтар, иллюстрациялар және мұғалімге арналған мәтін.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool live-card" data-category="lesson"><div class="tool-top"><div class="tool-icon">📝</div><span class="tool-status live">ЖҰМЫС ІСТЕЙДІ</span></div><h2>Жазбаша материалдар</h2><p>Авторлық бағдарлама, эссе, мақала, баяндама, жұмбақ және тапсырмалар.</p><a class="tool-action" href="/text-tools.html?mode=essay">Ашу</a></article>
+      <article class="platform-tool" data-category="interactive"><div class="tool-top"><div class="tool-icon">▦</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Е-Тапқыр</h2><p>Оқушы QR-кодпен кіретін викторина, рейтинг және нәтиже талдауы.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="interactive"><div class="tool-top"><div class="tool-icon">🎮</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Ойын құрастыру</h2><p>Сәйкестендіру, топтастыру, карточка және сәттілік дөңгелегі.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="interactive"><div class="tool-top"><div class="tool-icon">🎯</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Сабақ ойындары</h2><p>Уақыт сызығы, сөз іздеу, ақиқат/жалған, ыстық микрофон және тізбек.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="lesson"><div class="tool-top"><div class="tool-icon">🖼️</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Көрнекіліктер</h2><p>Карта, портрет, тарихи дерек, инфографика және бағалау карточкалары.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="interactive"><div class="tool-top"><div class="tool-icon">🌍</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Е-Алем</h2><p>Елдер, мемлекеттер және тарихи оқиғаларды карта арқылы меңгеру.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="interactive"><div class="tool-top"><div class="tool-icon">🧪</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Химия зертханасы</h2><p>Элементтер, формулалар және негізгі ұғымдарға арналған ойындар.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="interactive"><div class="tool-top"><div class="tool-icon">⚡</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Интерактивті PowerPoint</h2><p>Интернетсіз ашылатын анимациялы және дыбысты сабақ ойындары.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="lesson"><div class="tool-top"><div class="tool-icon">🧩</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Е-KIDS</h2><p>Мектепалды даярлыққа арналған әріп, сан және мінез-құлық ойындары.</p><button class="tool-action planned">Жақында</button></article>
+      <article class="platform-tool" data-category="growth"><div class="tool-top"><div class="tool-icon">🎓</div><span class="tool-status">ӘЗІРЛЕНУДЕ</span></div><h2>Курстар</h2><p>Пәндік біліктілік, цифрлық құралдар және мұғалімнің кәсіби дамуы.</p><button class="tool-action planned">Жақында</button></article>
+    </section>
+    <p class="tool-empty" id="toolEmpty">Бұл санатта құрал табылмады.</p>
+  </main>
+  <nav class="mobile-nav" aria-label="Негізгі мәзір"><a href="/">Басты бет</a><a class="active" href="/tools.html">Құралдар</a><a href="/account.html">Кабинет</a></nav>
+  <div class="tools-toast hidden" id="toolsToast"></div>
+  <script>
+    const cards=[...document.querySelectorAll('.platform-tool')],filters=[...document.querySelectorAll('.tool-filters button')],toast=document.querySelector('#toolsToast');
+    filters.forEach(button=>button.addEventListener('click',()=>{filters.forEach(item=>item.classList.remove('active'));button.classList.add('active');const filter=button.dataset.filter;let count=0;cards.forEach(card=>{const visible=filter==='all'||card.dataset.category===filter;card.classList.toggle('hidden',!visible);if(visible)count+=1});document.querySelector('#toolEmpty').style.display=count?'none':'block'}));
+    document.querySelectorAll('.planned').forEach(button=>button.addEventListener('click',()=>{toast.textContent='Бұл құрал әзірленіп жатыр';toast.classList.remove('hidden');clearTimeout(window.toolToastTimer);window.toolToastTimer=setTimeout(()=>toast.classList.add('hidden'),2500)}));
+  </script>
+</body>
+</html>
