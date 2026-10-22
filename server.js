@@ -4,6 +4,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const PptxGenJS = require('pptxgenjs');
+const QRCode = require('qrcode');
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
@@ -21,7 +23,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ACCESS_CODE_SECRET = process.env.ACCESS_CODE_SECRET || '';
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
 const loginAttempts = new Map();
 let referenceDatabase = { records: [] };
 try {
@@ -723,6 +725,89 @@ async function generateTextTool(body) {
   return { content, model: result.model || AI_MODEL, title: String(body.title || prompt).slice(0, 120) };
 }
 
+async function generateQuiz(body) {
+  const config = apiConfig();
+  if (!config.key) throw Object.assign(new Error('Викторина құрастыру үшін ЖИ кілті серверде орнатылмаған'), { status: 503 });
+  const count = Math.min(30, Math.max(3, Number(body.questionCount) || 10));
+  const system = `Сен Қазақстан мектебінің әдіскерісің. Берілген пән, сынып және тақырып бойынша дәл ${count} тест сұрағын дайында. Әр сұрақта 4 жауап нұсқасы және бір ғана дұрыс жауап болсын. Фактілерді тексер, жас ерекшелігін сақта. Тек JSON қайтар: {"questions":[{"text":"...","choices":["...","...","...","..."],"answer":0,"explanation":"..."}]}. answer — 0 мен 3 арасындағы индекс.`;
+  const user = `Пән: ${String(body.subject || '')}\nСынып: ${String(body.grade || '')}\nТақырып: ${String(body.topic || '')}\nҚосымша талап: ${String(body.requirements || 'жоқ')}`;
+  const headers = { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' };
+  if (AI_PROVIDER !== 'openai') Object.assign(headers, { 'HTTP-Referer': process.env.PUBLIC_URL || `http://localhost:${PORT}`, 'X-Title': 'e-tarih' });
+  const response = await fetch(config.url, { method: 'POST', headers, body: JSON.stringify({ model: AI_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.35, max_tokens: 5000 }) });
+  const result = await response.json();
+  if (!response.ok) throw Object.assign(new Error(result?.error?.message || 'Викторина жасалмады'), { status: 502 });
+  const cleaned = String(result?.choices?.[0]?.message?.content || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  let parsed;
+  try { parsed = JSON.parse(cleaned); } catch { throw Object.assign(new Error('ЖИ викторинаны дұрыс форматта қайтармады. Қайта жасап көріңіз'), { status: 502 }); }
+  const questions = (Array.isArray(parsed?.questions) ? parsed.questions : []).map(item => ({
+    text: String(item?.text || '').trim().slice(0, 500),
+    choices: (Array.isArray(item?.choices) ? item.choices : []).map(value => String(value || '').trim().slice(0, 240)).slice(0, 4),
+    answer: Math.max(0, Math.min(3, Math.round(Number(item?.answer) || 0))),
+    explanation: String(item?.explanation || '').trim().slice(0, 500)
+  })).filter(item => item.text && item.choices.length === 4).slice(0, count);
+  if (questions.length < 3) throw Object.assign(new Error('Жарамды сұрақтар жеткіліксіз. Қайта жасап көріңіз'), { status: 502 });
+  return questions;
+}
+
+function publicOrigin(req) {
+  if (process.env.PUBLIC_URL) return String(process.env.PUBLIC_URL).replace(/\/$/, '');
+  const protocol = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`).split(',')[0].trim();
+  return `${protocol}://${host}`;
+}
+
+function safeFilename(value, fallback = 'e-tarih') {
+  const cleaned = String(value || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').trim();
+  return (cleaned || fallback).slice(0, 80);
+}
+
+function presentationSections(content) {
+  const lines = String(content || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const sections = [];
+  let current = { title: 'Негізгі мазмұн', lines: [] };
+  for (const line of lines) {
+    const heading = line.match(/^(?:#{1,3}\s*|(?:Слайд|SLIDE)\s*\d+[.:\-]?\s*)(.+)$/i);
+    if (heading && current.lines.length) {
+      sections.push(current);
+      current = { title: heading[1].replace(/[*_]/g, '').slice(0, 100), lines: [] };
+    } else if (heading) current.title = heading[1].replace(/[*_]/g, '').slice(0, 100);
+    else current.lines.push(line.replace(/^[-*•]\s*/, ''));
+  }
+  if (current.lines.length || current.title) sections.push(current);
+  return sections.flatMap(section => {
+    const chunks = [];
+    for (let i = 0; i < section.lines.length; i += 7) chunks.push({ title: chunks.length ? `${section.title} (жалғасы)` : section.title, lines: section.lines.slice(i, i + 7) });
+    return chunks.length ? chunks : [{ title: section.title, lines: [''] }];
+  }).slice(0, 30);
+}
+
+async function createPresentationBuffer(title, content, subtitle = '') {
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE';
+  pptx.author = 'Е-Тарих';
+  pptx.subject = title;
+  pptx.title = title;
+  pptx.company = 'Е-Тарих';
+  pptx.lang = 'kk-KZ';
+  pptx.theme = { headFontFace: 'Aptos Display', bodyFontFace: 'Aptos', lang: 'kk-KZ' };
+  let slide = pptx.addSlide();
+  slide.background = { color: 'F4F7FC' };
+  slide.addText('Е-Тарих', { x: 0.7, y: 0.55, w: 2.2, h: 0.35, fontSize: 15, bold: true, color: '246BFD' });
+  slide.addText(title, { x: 0.75, y: 2.15, w: 11.8, h: 1.25, fontSize: 30, bold: true, color: '14213D', align: 'center', breakLine: false, margin: 0.05 });
+  if (subtitle) slide.addText(subtitle, { x: 1.25, y: 3.65, w: 10.8, h: 0.8, fontSize: 16, color: '667085', align: 'center', margin: 0.04 });
+  slide.addText('Мұғалімге арналған білім беру платформасы', { x: 2.3, y: 6.75, w: 8.7, h: 0.3, fontSize: 11, color: '7B879D', align: 'center' });
+  const sections = presentationSections(content);
+  sections.forEach((section, index) => {
+    slide = pptx.addSlide();
+    slide.background = { color: index % 2 ? 'F7F9FD' : 'FFFFFF' };
+    slide.addText(section.title || `Слайд ${index + 2}`, { x: 0.65, y: 0.45, w: 12.05, h: 0.65, fontSize: 24, bold: true, color: '14213D', margin: 0.03 });
+    const bullets = section.lines.map(text => ({ text, options: { bullet: { indent: 16 }, hanging: 4, breakLine: true } }));
+    slide.addText(bullets, { x: 0.85, y: 1.35, w: 11.5, h: 5.35, fontSize: 18, color: '334155', breakLine: true, valign: 'mid', margin: 0.08, paraSpaceAfterPt: 12, fit: 'shrink' });
+    slide.addText(`${index + 2}`, { x: 12.1, y: 7.0, w: 0.5, h: 0.2, fontSize: 9, color: '94A3B8', align: 'right' });
+  });
+  return pptx.write({ outputType: 'nodebuffer' });
+}
+
 async function handleApi(req, res, pathname) {
   try {
     const referenceDocxMatch = pathname.match(/^\/api\/reference-docx\/([0-9a-f]{16})$/i);
@@ -769,6 +854,78 @@ async function handleApi(req, res, pathname) {
       if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
       if (body.subject && !codeAllowsSubject(access.record, body.subject)) return sendJson(res, 403, { error: `Бұл код «${body.subject}» пәніне рұқсат бермейді`, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
       return sendJson(res, 200, await generateTextTool(body));
+    }
+    if (req.method === 'POST' && pathname === '/api/tools/pptx') {
+      const body = await readJson(req);
+      const access = await verifyAccessCode(requestAccessCode(req, body), true, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
+      const title = String(body.title || 'Е-Тарих презентациясы').trim().slice(0, 140);
+      const content = String(body.content || '').trim();
+      if (content.length < 10 || content.length > 80000) return sendJson(res, 400, { error: 'Презентация мәтіні бос немесе тым үлкен' });
+      const data = await createPresentationBuffer(title, content, String(body.subtitle || '').slice(0, 180));
+      const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+      res.writeHead(200, {
+        'Content-Type': MIME['.pptx'],
+        'Content-Length': buffer.length,
+        'Cache-Control': 'private, no-store',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(safeFilename(title))}.pptx"`
+      });
+      return res.end(buffer);
+    }
+    if (req.method === 'POST' && pathname === '/api/quiz/create') {
+      const body = await readJson(req);
+      const access = await verifyAccessCode(requestAccessCode(req, body), true, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
+      if (body.subject && !codeAllowsSubject(access.record, body.subject)) return sendJson(res, 403, { error: `Бұл код «${body.subject}» пәніне рұқсат бермейді` });
+      const questions = await generateQuiz(body);
+      const teacher = await authenticatedTeacher(req);
+      const rows = await dbRequest('quizzes', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+        access_code_id: access.record.id,
+        teacher_id: teacher?.id || null,
+        title: String(body.title || body.topic || 'Е-Тапқыр викторинасы').trim().slice(0, 180),
+        subject: String(body.subject || '').slice(0, 100),
+        grade: String(body.grade || '').slice(0, 30),
+        questions
+      }) });
+      const quiz = rows?.[0];
+      const url = `${publicOrigin(req)}/quiz.html?id=${encodeURIComponent(quiz.id)}`;
+      const qrDataUrl = await QRCode.toDataURL(url, { width: 420, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#14213D', light: '#FFFFFF' } });
+      return sendJson(res, 201, { quiz: { id: quiz.id, title: quiz.title, questionCount: questions.length }, url, qrDataUrl });
+    }
+    const quizMatch = pathname.match(/^\/api\/quiz\/([0-9a-f-]+)$/i);
+    if (quizMatch && req.method === 'GET') {
+      const id = encodeURIComponent(quizMatch[1]);
+      const rows = await dbRequest(`quizzes?id=eq.${id}&is_active=eq.true&select=id,title,subject,grade,questions&limit=1`);
+      const quiz = rows?.[0];
+      if (!quiz) return sendJson(res, 404, { error: 'Викторина табылмады немесе жабылған' });
+      const questions = (quiz.questions || []).map((item, index) => ({ index, text: item.text, choices: item.choices }));
+      return sendJson(res, 200, { quiz: { id: quiz.id, title: quiz.title, subject: quiz.subject, grade: quiz.grade, questions } });
+    }
+    const quizSubmitMatch = pathname.match(/^\/api\/quiz\/([0-9a-f-]+)\/submit$/i);
+    if (quizSubmitMatch && req.method === 'POST') {
+      const body = await readJson(req);
+      const studentName = String(body.studentName || '').trim().slice(0, 100);
+      if (studentName.length < 2) return sendJson(res, 400, { error: 'Оқушының аты-жөнін енгізіңіз' });
+      const id = encodeURIComponent(quizSubmitMatch[1]);
+      const rows = await dbRequest(`quizzes?id=eq.${id}&is_active=eq.true&select=id,questions&limit=1`);
+      const quiz = rows?.[0];
+      if (!quiz) return sendJson(res, 404, { error: 'Викторина жабылған' });
+      const answers = Array.isArray(body.answers) ? body.answers.map(value => Number(value)) : [];
+      const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+      const score = questions.reduce((sum, question, index) => sum + (answers[index] === Number(question.answer) ? 1 : 0), 0);
+      await dbRequest('quiz_attempts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ quiz_id: quiz.id, student_name: studentName, answers, score, total: questions.length }) });
+      const review = questions.map((question, index) => ({ correct: answers[index] === Number(question.answer), answer: Number(question.answer), explanation: question.explanation || '' }));
+      return sendJson(res, 200, { score, total: questions.length, review });
+    }
+    const quizResultsMatch = pathname.match(/^\/api\/quiz\/([0-9a-f-]+)\/results$/i);
+    if (quizResultsMatch && req.method === 'GET') {
+      const access = await verifyAccessCode(requestAccessCode(req), false, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error });
+      const id = encodeURIComponent(quizResultsMatch[1]);
+      const quizzes = await dbRequest(`quizzes?id=eq.${id}&access_code_id=eq.${encodeURIComponent(access.record.id)}&select=id,title&limit=1`);
+      if (!quizzes?.[0]) return sendJson(res, 403, { error: 'Бұл викторинаның нәтижелерін көруге рұқсат жоқ' });
+      const attempts = await dbRequest(`quiz_attempts?quiz_id=eq.${id}&select=id,student_name,score,total,created_at&order=score.desc,created_at.asc&limit=500`);
+      return sendJson(res, 200, { quiz: quizzes[0], attempts: attempts || [] });
     }
     if (req.method === 'POST' && pathname === '/api/account/register') {
       const body = await readJson(req);
