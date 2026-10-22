@@ -16,7 +16,7 @@
     <section class="text-tool-heading"><span class="badge">Е-Тарих құралдары</span><h1 id="pageTitle">Е-Көмекші</h1><p id="pageDescription">Мұғалім сұрағына жауап беріп, қолдануға дайын материал әзірлейді.</p></section>
     <div class="text-tool-layout">
       <form class="tool-form" id="textToolForm">
-        <div class="tool-mode"><button type="button" data-mode="assistant">Е-Көмекші</button><button type="button" data-mode="essay">Эссе</button><button type="button" data-mode="article">Мақала</button><button type="button" data-mode="report">Баяндама</button><button type="button" data-mode="author-program">Авторлық бағдарлама</button><button type="button" data-mode="worksheet">Жұмыс парағы</button></div>
+        <div class="tool-mode"><button type="button" data-mode="assistant">Е-Көмекші</button><button type="button" data-mode="bjb">БЖБ</button><button type="button" data-mode="tjb">ТЖБ</button><button type="button" data-mode="essay">Эссе</button><button type="button" data-mode="article">Мақала</button><button type="button" data-mode="report">Баяндама</button><button type="button" data-mode="author-program">Авторлық бағдарлама</button><button type="button" data-mode="worksheet">Жұмыс парағы</button></div>
         <div class="code-row"><label>Кіру коды<input id="toolAccessCode" autocomplete="off" placeholder="ERNUR-XXXXX-XXXXX" required></label><button id="useSavedCode" type="button">Сақталған код</button></div>
         <div class="grid two"><label>Пән<select id="toolSubject" required><option value="">Пәнді таңдаңыз</option></select></label><label>Сынып<select id="toolGrade" required><option value="">Сыныпты таңдаңыз</option></select></label></div>
         <label id="promptLabel">Сұрағыңыз немесе тақырып<textarea id="toolPrompt" rows="6" required placeholder="Мысалы: Алаш қозғалысын оқушыларға түсіндірудің тиімді әдістерін ұсын"></textarea></label>
@@ -24,7 +24,7 @@
         <p class="access-hint">ҚМЖ сайтындағы белсенді код пайдаланылады. Қолжетімді пән кодтағы рұқсатқа сәйкес тексеріледі.</p>
         <p class="error" id="toolError"></p><button class="generate" id="toolGenerate" type="submit">✦ Материал дайындау</button>
       </form>
-      <section class="tool-result"><div class="tool-result-head"><h2>Дайын материал</h2><div class="result-actions"><button id="copyToolResult" type="button">Көшіру</button><button class="word" id="downloadToolWord" type="button">Word жүктеу</button></div></div><div class="tool-placeholder" id="toolPlaceholder"><b>ЕТ</b><h3>Нәтиже осы жерде шығады</h3><p>Құрал түрін таңдап, сұранысты жазыңыз.</p></div><article class="tool-output hidden" id="toolOutput"></article></section>
+      <section class="tool-result"><div class="tool-result-head"><h2>Дайын материал</h2><div class="result-actions"><button id="saveToolResult" type="button">Кабинетке сақтау</button><button id="copyToolResult" type="button">Көшіру</button><button class="word" id="downloadToolWord" type="button">Word жүктеу</button></div></div><div class="tool-placeholder" id="toolPlaceholder"><b>ЕТ</b><h3>Нәтиже осы жерде шығады</h3><p>Құрал түрін таңдап, сұранысты жазыңыз.</p></div><article class="tool-output hidden" id="toolOutput"></article></section>
     </div>
   </main>
   <nav class="mobile-nav" aria-label="Негізгі мәзір"><a href="/">Басты бет</a><a class="active" href="/tools.html">Құралдар</a><a href="/account.html">Кабинет</a></nav>
