@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="kk">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#246bfd">
+  <title>Е-Көмекші және жазбаша материалдар — Е-Тарих</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css">
+  <style>
+    .text-tool-page{min-height:100vh;background:#f5f8fd}.text-tool-main{padding:50px max(4vw,16px) 95px}.text-tool-heading{max-width:1200px;margin:0 auto 28px}.text-tool-heading h1{font-size:clamp(34px,5vw,55px);letter-spacing:-.04em;margin:9px 0}.text-tool-heading p{color:var(--muted);line-height:1.6}.text-tool-layout{max-width:1200px;margin:auto;display:grid;grid-template-columns:430px minmax(0,1fr);gap:18px;align-items:start}.tool-form,.tool-result{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 30px rgba(31,48,91,.06)}.tool-form{display:grid;gap:15px;padding:22px}.tool-result{min-height:620px;padding:22px;position:sticky;top:90px}.tool-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tool-mode button{border:1px solid var(--line);border-radius:10px;padding:11px;background:#f7f9fd;color:#536078;font-weight:850}.tool-mode button.active{border-color:var(--blue);background:#edf3ff;color:var(--blue)}.code-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.code-row button{height:44px;border:0;border-radius:9px;padding:0 13px;background:#edf3ff;color:var(--blue);font-weight:850}.tool-result-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}.tool-result-head h2{font-size:18px;margin:0}.result-actions{display:flex;gap:6px}.result-actions button{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:#526078;font-weight:800}.result-actions .word{background:var(--blue);border-color:var(--blue);color:#fff}.tool-output{padding:18px 4px;white-space:pre-wrap;line-height:1.65}.tool-placeholder{min-height:520px;display:grid;place-content:center;text-align:center;color:var(--muted)}.tool-placeholder b{font-size:36px;color:var(--blue)}.tool-loading{opacity:.55}.access-hint{margin:0;padding:10px;border-radius:9px;background:#f1f6ff;color:#315da9;font-size:12px;line-height:1.45}
+    @media(max-width:900px){.text-tool-layout{grid-template-columns:1fr}.tool-result{position:static;min-height:450px}.tool-placeholder{min-height:350px}}
+    @media(max-width:650px){body{padding-bottom:66px}.text-tool-main{padding:30px 12px 85px}.text-tool-heading h1{font-size:35px}.tool-form,.tool-result{padding:15px}.tool-mode{grid-template-columns:1fr}.code-row{grid-template-columns:1fr}.text-tool-page .header-button{display:none}.result-actions{overflow:auto}}
+  </style>
+</head>
+<body class="text-tool-page">
+  <header class="header"><a class="brand" href="/"><span>ЕТ</span><strong>Е-Тарих</strong></a><nav><a href="/">Басты бет</a><a href="/tools.html">Құралдар</a><a href="/text-tools.html?mode=assistant">Е-Көмекші</a><a href="/account.html">Жеке кабинет</a></nav><a class="header-button" href="/tools.html">Барлық құрал</a></header>
+  <main class="text-tool-main">
+    <section class="text-tool-heading"><span class="badge">Е-Тарих құралдары</span><h1 id="pageTitle">Е-Көмекші</h1><p id="pageDescription">Мұғалім сұрағына жауап беріп, қолдануға дайын материал әзірлейді.</p></section>
+    <div class="text-tool-layout">
+      <form class="tool-form" id="textToolForm">
+        <div class="tool-mode"><button type="button" data-mode="assistant">Е-Көмекші</button><button type="button" data-mode="essay">Эссе</button><button type="button" data-mode="article">Мақала</button><button type="button" data-mode="report">Баяндама</button><button type="button" data-mode="author-program">Авторлық бағдарлама</button><button type="button" data-mode="worksheet">Жұмыс парағы</button></div>
+        <div class="code-row"><label>Кіру коды<input id="toolAccessCode" autocomplete="off" placeholder="ERNUR-XXXXX-XXXXX" required></label><button id="useSavedCode" type="button">Сақталған код</button></div>
+        <div class="grid two"><label>Пән<select id="toolSubject" required><option value="">Пәнді таңдаңыз</option></select></label><label>Сынып<select id="toolGrade" required><option value="">Сыныпты таңдаңыз</option></select></label></div>
+        <label id="promptLabel">Сұрағыңыз немесе тақырып<textarea id="toolPrompt" rows="6" required placeholder="Мысалы: Алаш қозғалысын оқушыларға түсіндірудің тиімді әдістерін ұсын"></textarea></label>
+        <label>Қосымша талап<textarea id="toolRequirements" rows="3" placeholder="Көлемі, стилі, бөлімдері немесе ерекше талаптары"></textarea></label>
+        <p class="access-hint">ҚМЖ сайтындағы белсенді код пайдаланылады. Қолжетімді пән кодтағы рұқсатқа сәйкес тексеріледі.</p>
+        <p class="error" id="toolError"></p><button class="generate" id="toolGenerate" type="submit">✦ Материал дайындау</button>
+      </form>
+      <section class="tool-result"><div class="tool-result-head"><h2>Дайын материал</h2><div class="result-actions"><button id="copyToolResult" type="button">Көшіру</button><button class="word" id="downloadToolWord" type="button">Word жүктеу</button></div></div><div class="tool-placeholder" id="toolPlaceholder"><b>ЕТ</b><h3>Нәтиже осы жерде шығады</h3><p>Құрал түрін таңдап, сұранысты жазыңыз.</p></div><article class="tool-output hidden" id="toolOutput"></article></section>
+    </div>
+  </main>
+  <nav class="mobile-nav" aria-label="Негізгі мәзір"><a href="/">Басты бет</a><a class="active" href="/tools.html">Құралдар</a><a href="/account.html">Кабинет</a></nav>
+  <div class="toast hidden" id="toast"></div><script src="/vendor/jszip.min.js" defer></script><script src="/text-tools.js" defer></script>
+</body>
+</html>
