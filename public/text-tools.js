@@ -37,7 +37,7 @@ const modeInfo = {
 };
 
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toast.timer); toast.timer = setTimeout(() => $('#toast').classList.add('hidden'), 2500); }
-function setMode(mode) { activeMode = modeInfo[mode] ? mode : 'assistant'; const info = modeInfo[activeMode]; $('#pageTitle').textContent = info[0]; $('#pageDescription').textContent = info[1]; $('#promptLabel').childNodes[0].nodeValue = info[2]; $('#toolPrompt').placeholder = ['bjb', 'tjb'].includes(activeMode) ? 'Мысалы: 2-тоқсан. Бөлім: ...\nОқу мақсаттары: ...\nТапсырма саны: 6\nЖалпы балл: 20\nУақыты: 40 минут' : 'Тақырыпты және қажетті талаптарды толық жазыңыз'; document.querySelectorAll('[data-mode]').forEach(button => button.classList.toggle('active', button.dataset.mode === activeMode)); history.replaceState(null, '', `?mode=${activeMode}`); }
+function setMode(mode) { activeMode = modeInfo[mode] ? mode : 'assistant'; const info = modeInfo[activeMode]; $('#pageTitle').textContent = info[0]; $('#pageDescription').textContent = info[1]; $('#promptLabel').childNodes[0].nodeValue = info[2]; $('#toolPrompt').placeholder = ['bjb', 'tjb'].includes(activeMode) ? 'Мысалы: 2-тоқсан. Бөлім: ...\nОқу мақсаттары: ...\nТапсырма саны: 6\nЖалпы балл: 20\nУақыты: 40 минут' : 'Тақырыпты және қажетті талаптарды толық жазыңыз'; $('#downloadToolPptx').classList.toggle('hidden', !['presentation', 'interactive-ppt'].includes(activeMode)); document.querySelectorAll('[data-mode]').forEach(button => button.classList.toggle('active', button.dataset.mode === activeMode)); history.replaceState(null, '', `?mode=${activeMode}`); }
 
 async function loadOptions() {
   const subjects = await fetch('/subjects.json').then(response => response.json());
@@ -91,11 +91,27 @@ async function downloadWord() {
   const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${currentTitle.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.docx`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 30000);
 }
 
+async function downloadPowerPoint() {
+  if (!currentResult) return toast('Алдымен презентация мазмұнын дайындаңыз');
+  const accessCode = $('#toolAccessCode').value.trim().toUpperCase();
+  const button = $('#downloadToolPptx');
+  button.disabled = true;
+  try {
+    const response = await fetch('/api/tools/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessCode}`, 'X-Device-Id': deviceId }, body: JSON.stringify({ title: currentTitle, subtitle: `${$('#toolSubject').value} · ${$('#toolGrade').value}`, content: currentResult }) });
+    if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'PowerPoint жасалмады'); }
+    const blob = await response.blob();
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${currentTitle.replace(/[\\/:*?"<>|]/g, '-').slice(0, 70)}.pptx`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 30000);
+    toast('PowerPoint жүктелді');
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+}
+
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
 $('#useSavedCode').addEventListener('click', () => { $('#toolAccessCode').value = localStorage.getItem(ACCESS_KEY) || ''; toast($('#toolAccessCode').value ? 'Сақталған код қойылды' : 'Сақталған код табылмады'); });
 $('#textToolForm').addEventListener('submit', generate);
 $('#copyToolResult').addEventListener('click', async () => { if (!currentResult) return toast('Нәтиже жоқ'); await navigator.clipboard.writeText(currentResult); toast('Мәтін көшірілді'); });
 $('#saveToolResult').addEventListener('click', () => saveToCabinet().catch(error => toast(error.message)));
 $('#downloadToolWord').addEventListener('click', downloadWord);
+$('#downloadToolPptx').addEventListener('click', downloadPowerPoint);
 $('#toolAccessCode').value = localStorage.getItem(ACCESS_KEY) || '';
 setMode(activeMode); loadOptions().catch(() => { $('#toolError').textContent = 'Пәндер тізімі жүктелмеді'; });
