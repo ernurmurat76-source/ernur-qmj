@@ -671,7 +671,7 @@ async function generatePlan(body) {
   }
 }
 
-const TEXT_TOOL_MODES = new Set(['assistant', 'essay', 'article', 'report', 'author-program', 'worksheet', 'riddle']);
+const TEXT_TOOL_MODES = new Set(['assistant', 'essay', 'article', 'report', 'author-program', 'worksheet', 'riddle', 'bjb', 'tjb']);
 
 async function generateTextTool(body) {
   const mode = String(body.mode || 'assistant');
@@ -687,9 +687,14 @@ async function generateTextTool(body) {
     report: 'ресми баяндама',
     'author-program': 'авторлық бағдарламаның мазмұны мен құрылымы',
     worksheet: 'оқушыға арналған жұмыс парағы',
-    riddle: 'оқу тақырыбына сай жұмбақтар мен қысқа тапсырмалар'
+    riddle: 'оқу тақырыбына сай жұмбақтар мен қысқа тапсырмалар',
+    bjb: 'бөлім бойынша жиынтық бағалау (БЖБ)',
+    tjb: 'тоқсан бойынша жиынтық бағалау (ТЖБ)'
   };
-  const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. ${labels[mode]} дайында. Мәтін қазақ тілінде, сауатты, түсінікті және мұғалім бірден қолданатындай болсын. Пайдаланушы бермеген оқу мақсатын немесе ресми деректі ойдан қоспа. Қажет болса тақырыпшалар мен нөмірленген тізім қолдан. Markdown кестесін қолданба. Тек дайын материалды қайтар.`;
+  const assessmentRules = ['bjb', 'tjb'].includes(mode)
+    ? ' Берілген оқу мақсаттарын өзгеріссіз сақта. Алдымен бағалау критерийлерін жаз. Әртүрлі деңгейдегі нақты тапсырмалар бер. Әр тапсырманың астына дескриптор мен балл қой. Соңында толық жауап кілтін және жалпы баллды көрсет. Тапсырмалар балдарының қосындысы пайдаланушы көрсеткен жалпы баллға дәл келсін. Ресми оқу мақсатын ойдан шығарма.'
+    : '';
+  const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. ${labels[mode]} дайында. Мәтін қазақ тілінде, сауатты, түсінікті және мұғалім бірден қолданатындай болсын. Пайдаланушы бермеген оқу мақсатын немесе ресми деректі ойдан қоспа.${assessmentRules} Қажет болса тақырыпшалар мен нөмірленген тізім қолдан. Markdown кестесін қолданба. Тек дайын материалды қайтар.`;
   const user = `Құрал: ${labels[mode]}\nПән: ${String(body.subject || 'көрсетілмеген')}\nСынып: ${String(body.grade || 'көрсетілмеген')}\nТақырып/сұраныс: ${prompt}\nҚосымша талап: ${String(body.requirements || 'жоқ')}`;
   const headers = { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' };
   if (AI_PROVIDER !== 'openai') Object.assign(headers, { 'HTTP-Referer': process.env.PUBLIC_URL || `http://localhost:${PORT}`, 'X-Title': 'e-tarih' });
