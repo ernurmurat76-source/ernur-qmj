@@ -3,6 +3,7 @@
 const $ = selector => document.querySelector(selector);
 const ACCESS_KEY = 'ernur-qmj-access-code';
 const DEVICE_KEY = 'ernur-qmj-device-id';
+const TEACHER_TOKEN_KEY = 'e-tarih-teacher-token';
 let deviceId = localStorage.getItem(DEVICE_KEY) || '';
 let activeMode = new URLSearchParams(location.search).get('mode') || 'assistant';
 let currentResult = '';
@@ -19,11 +20,13 @@ const modeInfo = {
   article: ['Мақала құрастыру', 'Тақырыпшалары мен қорытындысы бар мақала дайындайды.', 'Мақала тақырыбы'],
   report: ['Баяндама құрастыру', 'Мектепте қолдануға болатын ресми баяндама әзірлейді.', 'Баяндама тақырыбы'],
   'author-program': ['Авторлық бағдарлама', 'Авторлық бағдарламаның құрылымы мен мазмұнын әзірлейді.', 'Бағдарлама тақырыбы'],
-  worksheet: ['Жұмыс парағы', 'Оқушыға арналған тапсырмалар мен жұмыс парағын дайындайды.', 'Сабақ тақырыбы']
+  worksheet: ['Жұмыс парағы', 'Оқушыға арналған тапсырмалар мен жұмыс парағын дайындайды.', 'Сабақ тақырыбы'],
+  bjb: ['БЖБ құрастыру', 'Бөлім бойынша тапсырмалар, дескрипторлар, балл және жауап кілтін дайындайды.', 'Бөлім, оқу мақсаттары және тапсырма талаптары'],
+  tjb: ['ТЖБ құрастыру', 'Тоқсан бойынша тапсырмалар, дескрипторлар, балл және жауап кілтін дайындайды.', 'Тоқсан, оқу мақсаттары және тапсырма талаптары']
 };
 
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toast.timer); toast.timer = setTimeout(() => $('#toast').classList.add('hidden'), 2500); }
-function setMode(mode) { activeMode = modeInfo[mode] ? mode : 'assistant'; const info = modeInfo[activeMode]; $('#pageTitle').textContent = info[0]; $('#pageDescription').textContent = info[1]; $('#promptLabel').childNodes[0].nodeValue = info[2]; document.querySelectorAll('[data-mode]').forEach(button => button.classList.toggle('active', button.dataset.mode === activeMode)); history.replaceState(null, '', `?mode=${activeMode}`); }
+function setMode(mode) { activeMode = modeInfo[mode] ? mode : 'assistant'; const info = modeInfo[activeMode]; $('#pageTitle').textContent = info[0]; $('#pageDescription').textContent = info[1]; $('#promptLabel').childNodes[0].nodeValue = info[2]; $('#toolPrompt').placeholder = ['bjb', 'tjb'].includes(activeMode) ? 'Мысалы: 2-тоқсан. Бөлім: ...\nОқу мақсаттары: ...\nТапсырма саны: 6\nЖалпы балл: 20\nУақыты: 40 минут' : 'Тақырыпты және қажетті талаптарды толық жазыңыз'; document.querySelectorAll('[data-mode]').forEach(button => button.classList.toggle('active', button.dataset.mode === activeMode)); history.replaceState(null, '', `?mode=${activeMode}`); }
 
 async function loadOptions() {
   const subjects = await fetch('/subjects.json').then(response => response.json());
@@ -50,6 +53,21 @@ async function generate(event) {
 }
 
 function xmlEscape(value) { return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char])); }
+function htmlEscape(value) { return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
+
+async function saveToCabinet() {
+  if (!currentResult) return toast('Алдымен материал дайындаңыз');
+  const token = localStorage.getItem(TEACHER_TOKEN_KEY);
+  if (!token) return toast('Алдымен жеке кабинетке кіріңіз');
+  const subject = $('#toolSubject').value;
+  const grade = $('#toolGrade').value;
+  const title = `${modeInfo[activeMode][0]} — ${$('#toolPrompt').value.trim().split('\n')[0].slice(0, 100)}`;
+  const html = `<article class="qmj-document"><h2>${htmlEscape(title)}</h2>${currentResult.split(/\n/).map(line => `<p>${htmlEscape(line || ' ')}</p>`).join('')}</article>`;
+  const response = await fetch('/api/account/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Teacher-Token': token }, body: JSON.stringify({ title, html, text: currentResult, fields: { subject, grade, topic: title, toolMode: activeMode } }) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Материал сақталмады');
+  toast('Материал жеке кабинетке сақталды');
+}
 async function downloadWord() {
   if (!currentResult) return toast('Алдымен материал дайындаңыз');
   if (!window.JSZip) return toast('Word модулі жүктелмеді');
@@ -66,6 +84,7 @@ document.querySelectorAll('[data-mode]').forEach(button => button.addEventListen
 $('#useSavedCode').addEventListener('click', () => { $('#toolAccessCode').value = localStorage.getItem(ACCESS_KEY) || ''; toast($('#toolAccessCode').value ? 'Сақталған код қойылды' : 'Сақталған код табылмады'); });
 $('#textToolForm').addEventListener('submit', generate);
 $('#copyToolResult').addEventListener('click', async () => { if (!currentResult) return toast('Нәтиже жоқ'); await navigator.clipboard.writeText(currentResult); toast('Мәтін көшірілді'); });
+$('#saveToolResult').addEventListener('click', () => saveToCabinet().catch(error => toast(error.message)));
 $('#downloadToolWord').addEventListener('click', downloadWord);
 $('#toolAccessCode').value = localStorage.getItem(ACCESS_KEY) || '';
 setMode(activeMode); loadOptions().catch(() => { $('#toolError').textContent = 'Пәндер тізімі жүктелмеді'; });
