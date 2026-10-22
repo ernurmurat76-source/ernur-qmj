@@ -89,6 +89,60 @@ function verifyAdminSession(token) {
   } catch { return false; }
 }
 
+function createTeacherSession(account) {
+  const payload = encode(JSON.stringify({
+    v: 1,
+    role: 'teacher',
+    sub: account.id,
+    accessCodeId: account.access_code_id,
+    exp: Math.floor(Date.now() / 1000) + 30 * 86400
+  }));
+  return `TEACHER.${payload}.${sign(payload)}`;
+}
+
+function verifyTeacherSession(token) {
+  if (!ACCESS_CODE_SECRET) return null;
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'TEACHER' || !safeEqual(sign(parts[1]), parts[2])) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    if (payload.v !== 1 || payload.role !== 'teacher' || !payload.sub || payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
+function passwordDigest(password, salt) {
+  return crypto.scryptSync(String(password), String(salt), 64).toString('hex');
+}
+
+function validEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+}
+
+function teacherProfile(record) {
+  return {
+    id: record.id,
+    fullName: record.full_name,
+    email: record.email,
+    phone: record.phone || '',
+    school: record.school || '',
+    subject: record.subject || '',
+    createdAt: record.created_at
+  };
+}
+
+function requestTeacherToken(req) {
+  return String(req.headers['x-teacher-token'] || '').trim();
+}
+
+async function authenticatedTeacher(req) {
+  const session = verifyTeacherSession(requestTeacherToken(req));
+  if (!session) return null;
+  const rows = await dbRequest(`teacher_accounts?id=eq.${encodeURIComponent(session.sub)}&select=id,access_code_id,full_name,email,phone,school,subject,created_at&limit=1`);
+  return rows?.[0] || null;
+}
+
 function deviceFingerprint(deviceId) {
   const normalized = String(deviceId || '').trim();
   if (!/^[a-zA-Z0-9-]{20,80}$/.test(normalized)) return '';
@@ -193,7 +247,7 @@ function readJson(req) {
     let raw = '';
     req.on('data', chunk => {
       raw += chunk;
-      if (raw.length > 250000) reject(new Error('Сұраныс көлемі тым үлкен'));
+      if (raw.length > 1000000) reject(new Error('Сұраныс көлемі тым үлкен'));
     });
     req.on('end', () => {
       try { resolve(JSON.parse(raw || '{}')); }
@@ -617,6 +671,36 @@ async function generatePlan(body) {
   }
 }
 
+const TEXT_TOOL_MODES = new Set(['assistant', 'essay', 'article', 'report', 'author-program', 'worksheet', 'riddle']);
+
+async function generateTextTool(body) {
+  const mode = String(body.mode || 'assistant');
+  if (!TEXT_TOOL_MODES.has(mode)) throw Object.assign(new Error('Құрал түрі қате'), { status: 400 });
+  const prompt = String(body.prompt || '').trim();
+  if (prompt.length < 3 || prompt.length > 5000) throw Object.assign(new Error('Тапсырманы 3–5000 таңба аралығында жазыңыз'), { status: 400 });
+  const config = apiConfig();
+  if (!config.key) throw Object.assign(new Error('Е-Көмекші үшін ЖИ кілті серверде орнатылмаған'), { status: 503 });
+  const labels = {
+    assistant: 'мұғалімнің сұрағына нақты әдістемелік жауап',
+    essay: 'құрылымды эссе',
+    article: 'тақырыпшалары бар мақала',
+    report: 'ресми баяндама',
+    'author-program': 'авторлық бағдарламаның мазмұны мен құрылымы',
+    worksheet: 'оқушыға арналған жұмыс парағы',
+    riddle: 'оқу тақырыбына сай жұмбақтар мен қысқа тапсырмалар'
+  };
+  const system = `Сен Қазақстан мектебінің тәжірибелі әдіскерісің. ${labels[mode]} дайында. Мәтін қазақ тілінде, сауатты, түсінікті және мұғалім бірден қолданатындай болсын. Пайдаланушы бермеген оқу мақсатын немесе ресми деректі ойдан қоспа. Қажет болса тақырыпшалар мен нөмірленген тізім қолдан. Markdown кестесін қолданба. Тек дайын материалды қайтар.`;
+  const user = `Құрал: ${labels[mode]}\nПән: ${String(body.subject || 'көрсетілмеген')}\nСынып: ${String(body.grade || 'көрсетілмеген')}\nТақырып/сұраныс: ${prompt}\nҚосымша талап: ${String(body.requirements || 'жоқ')}`;
+  const headers = { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' };
+  if (AI_PROVIDER !== 'openai') Object.assign(headers, { 'HTTP-Referer': process.env.PUBLIC_URL || `http://localhost:${PORT}`, 'X-Title': 'e-tarih' });
+  const response = await fetch(config.url, { method: 'POST', headers, body: JSON.stringify({ model: AI_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: mode === 'assistant' ? 0.25 : 0.55, max_tokens: 3500 }) });
+  const result = await response.json();
+  if (!response.ok) throw Object.assign(new Error(result?.error?.message || 'ЖИ қызметі уақытша қолжетімсіз'), { status: 502 });
+  const content = String(result?.choices?.[0]?.message?.content || '').replace(/^```(?:text|markdown)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  if (!content) throw Object.assign(new Error('ЖИ бос жауап берді'), { status: 502 });
+  return { content, model: result.model || AI_MODEL, title: String(body.title || prompt).slice(0, 120) };
+}
+
 async function handleApi(req, res, pathname) {
   try {
     const referenceDocxMatch = pathname.match(/^\/api\/reference-docx\/([0-9a-f]{16})$/i);
@@ -656,6 +740,121 @@ async function handleApi(req, res, pathname) {
       const result = await verifyAccessCode(requestAccessCode(req, body), false, requestDeviceId(req));
       if (!result.ok) return sendJson(res, result.status, { error: result.error });
       return sendJson(res, 200, { ok: true, expiresAt: result.record.expires_at, days: result.record.duration_days, allowedSubjects: normalizeAllowedSubjects(result.record.allowed_subjects) });
+    }
+    if (req.method === 'POST' && pathname === '/api/tools/text') {
+      const body = await readJson(req);
+      const access = await verifyAccessCode(requestAccessCode(req, body), true, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error, codeRequired: true });
+      if (body.subject && !codeAllowsSubject(access.record, body.subject)) return sendJson(res, 403, { error: `Бұл код «${body.subject}» пәніне рұқсат бермейді`, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
+      return sendJson(res, 200, await generateTextTool(body));
+    }
+    if (req.method === 'POST' && pathname === '/api/account/register') {
+      const body = await readJson(req);
+      const fullName = String(body.fullName || '').trim().slice(0, 120);
+      const email = validEmail(body.email);
+      const password = String(body.password || '');
+      if (fullName.length < 3 || !email || password.length < 8) return sendJson(res, 400, { error: 'Аты-жөніңізді, дұрыс e-mail және кемінде 8 таңбалы құпиясөз енгізіңіз' });
+      const access = await verifyAccessCode(String(body.accessCode || ''), false, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error });
+      const existing = await dbRequest(`teacher_accounts?or=(email.eq.${encodeURIComponent(email)},access_code_id.eq.${encodeURIComponent(access.record.id)})&select=id,email&limit=1`);
+      if (existing?.length) return sendJson(res, 409, { error: 'Бұл e-mail немесе кіру коды бұрын тіркелген. «Кіру» бөлімін пайдаланыңыз' });
+      const salt = crypto.randomBytes(16).toString('hex');
+      const rows = await dbRequest('teacher_accounts', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          access_code_id: access.record.id,
+          full_name: fullName,
+          email,
+          phone: String(body.phone || '').trim().slice(0, 30),
+          school: String(body.school || '').trim().slice(0, 180),
+          subject: String(body.subject || '').trim().slice(0, 100),
+          password_salt: salt,
+          password_hash: passwordDigest(password, salt)
+        })
+      });
+      const account = rows?.[0];
+      return sendJson(res, 201, { token: createTeacherSession(account), profile: teacherProfile(account), accessCode: access.record.code, expiresAt: access.record.expires_at, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
+    }
+    if (req.method === 'POST' && pathname === '/api/account/login') {
+      if (loginBlocked(req)) return sendJson(res, 429, { error: 'Кіру әрекеті тым көп. 15 минуттан кейін қайталаңыз' });
+      const body = await readJson(req);
+      const email = validEmail(body.email);
+      const rows = email ? await dbRequest(`teacher_accounts?email=eq.${encodeURIComponent(email)}&select=id,access_code_id,full_name,email,phone,school,subject,password_salt,password_hash,created_at&limit=1`) : [];
+      const account = rows?.[0];
+      if (!account || !safeEqual(passwordDigest(String(body.password || ''), account.password_salt || ''), account.password_hash || '')) {
+        recordLoginFailure(req);
+        return sendJson(res, 401, { error: 'E-mail немесе құпиясөз қате' });
+      }
+      const codes = await dbRequest(`access_codes?id=eq.${encodeURIComponent(account.access_code_id)}&select=code&limit=1`);
+      const access = await verifyAccessCode(codes?.[0]?.code || '', false, requestDeviceId(req));
+      if (!access.ok) return sendJson(res, access.status, { error: access.error });
+      loginAttempts.delete(loginAttemptKey(req));
+      return sendJson(res, 200, { token: createTeacherSession(account), profile: teacherProfile(account), accessCode: access.record.code, expiresAt: access.record.expires_at, allowedSubjects: normalizeAllowedSubjects(access.record.allowed_subjects) });
+    }
+    if (pathname === '/api/account/me') {
+      const account = await authenticatedTeacher(req);
+      if (!account) return sendJson(res, 401, { error: 'Жеке кабинет сессиясы аяқталған' });
+      if (req.method === 'GET') return sendJson(res, 200, { profile: teacherProfile(account) });
+      if (req.method === 'PATCH') {
+        const body = await readJson(req);
+        const updates = {
+          full_name: String(body.fullName || account.full_name).trim().slice(0, 120),
+          phone: String(body.phone ?? account.phone ?? '').trim().slice(0, 30),
+          school: String(body.school ?? account.school ?? '').trim().slice(0, 180),
+          subject: String(body.subject ?? account.subject ?? '').trim().slice(0, 100),
+          updated_at: new Date().toISOString()
+        };
+        if (updates.full_name.length < 3) return sendJson(res, 400, { error: 'Аты-жөніңізді толық енгізіңіз' });
+        const rows = await dbRequest(`teacher_accounts?id=eq.${encodeURIComponent(account.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(updates) });
+        return sendJson(res, 200, { profile: teacherProfile(rows?.[0]) });
+      }
+      return sendJson(res, 405, { error: 'Әдіске рұқсат жоқ' });
+    }
+    if (pathname === '/api/account/documents') {
+      const account = await authenticatedTeacher(req);
+      if (!account) return sendJson(res, 401, { error: 'Құжаттарды көру үшін жеке кабинетке кіріңіз' });
+      if (req.method === 'GET') {
+        const rows = await dbRequest(`teacher_documents?teacher_id=eq.${encodeURIComponent(account.id)}&select=id,title,subject,grade,term,topic,created_at,updated_at&order=created_at.desc&limit=100`);
+        return sendJson(res, 200, { documents: rows || [] });
+      }
+      if (req.method === 'POST') {
+        const body = await readJson(req);
+        const html = String(body.html || '');
+        if (!html || html.length > 220000) return sendJson(res, 400, { error: 'Құжат бос немесе көлемі тым үлкен' });
+        const fields = body.fields && typeof body.fields === 'object' ? body.fields : {};
+        const rows = await dbRequest('teacher_documents', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({
+            teacher_id: account.id,
+            title: String(body.title || fields.topic || 'ҚМЖ').trim().slice(0, 180),
+            subject: String(fields.subject || '').slice(0, 100),
+            grade: String(fields.grade || '').slice(0, 30),
+            term: String(fields.term || '').slice(0, 10),
+            topic: String(fields.topic || '').slice(0, 180),
+            form_data: fields,
+            generated_html: html,
+            generated_text: String(body.text || '').slice(0, 20000)
+          })
+        });
+        return sendJson(res, 201, { document: rows?.[0] });
+      }
+      return sendJson(res, 405, { error: 'Әдіске рұқсат жоқ' });
+    }
+    const teacherDocumentMatch = pathname.match(/^\/api\/account\/documents\/([0-9a-f-]+)$/i);
+    if (teacherDocumentMatch) {
+      const account = await authenticatedTeacher(req);
+      if (!account) return sendJson(res, 401, { error: 'Жеке кабинетке кіріңіз' });
+      const id = encodeURIComponent(teacherDocumentMatch[1]);
+      if (req.method === 'GET') {
+        const rows = await dbRequest(`teacher_documents?id=eq.${id}&teacher_id=eq.${encodeURIComponent(account.id)}&select=*&limit=1`);
+        if (!rows?.[0]) return sendJson(res, 404, { error: 'Құжат табылмады' });
+        return sendJson(res, 200, { document: rows[0] });
+      }
+      if (req.method === 'DELETE') {
+        await dbRequest(`teacher_documents?id=eq.${id}&teacher_id=eq.${encodeURIComponent(account.id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        return sendJson(res, 200, { ok: true });
+      }
+      return sendJson(res, 405, { error: 'Әдіске рұқсат жоқ' });
     }
     if (req.method === 'POST' && pathname === '/api/admin/login') {
       if (!ADMIN_PASSWORD || !ACCESS_CODE_SECRET || !databaseReady()) return sendJson(res, 503, { error: 'Әкімші жүйесінің Environment айнымалылары толық орнатылмаған' });
@@ -755,3 +954,4 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => console.log(`ernur-qmj: http://${HOST}:${PORT}`));
+

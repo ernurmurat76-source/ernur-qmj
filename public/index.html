@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Қазақстан мұғалімдеріне арналған №130 бұйрық нысанындағы ҚМЖ құрастыру сервисі">
   <meta name="theme-color" content="#246bfd">
-  <title>Ernur Тарих — ҚМЖ құрастыру</title>
+  <title>Е-Тарих — мұғалімге арналған платформа</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -25,23 +25,23 @@
 </head>
 <body>
   <header class="header">
-    <a class="brand" href="#top"><span>ET</span><strong>Ernur Тарих</strong></a>
-    <nav><a href="#builder">ҚМЖ құрастыру</a><a href="#contact">Байланыс</a><a href="#about">Сайт туралы</a><a href="/admin.html">Әкімші</a></nav>
-    <a class="header-button" href="#builder">Кодпен кіру</a>
+    <a class="brand" href="#top"><span>ЕТ</span><strong>Е-Тарих</strong></a>
+    <nav><a href="#top">Басты бет</a><a href="/tools.html">Құралдар</a><a href="#builder">ҚМЖ жасау</a><a href="/account.html">Құжаттарым</a><a href="/admin.html">Әкімші</a></nav>
+    <a class="header-button" href="/account.html">Жеке кабинет</a>
   </header>
 
   <main id="top">
     <section class="hero">
       <div class="hero-copy">
-        <span class="badge">Мұғалімге арналған қарапайым сервис</span>
-        <h1>ҚМЖ-ны дұрыс құрылыммен <em>жылдам құрастырыңыз</em></h1>
-        <p>Пәнді, сыныпты, тақырып пен нақты оқу мақсатын енгізіңіз. Ernur Тарих №130 бұйрық нысанының міндетті жолдарына негізделген 45 минуттық сабақ жоспарын дайындайды.</p>
-        <div class="hero-actions"><a class="primary" href="#builder">ҚМЖ құрастыру</a><a class="secondary" href="#about">Қалай жұмыс істейді?</a></div>
+        <span class="badge">Мұғалімге арналған қарапайым платформа</span>
+        <h1>Сабақ құжатын <em>оңай әрі жылдам</em> дайындаңыз</h1>
+        <p>Пәнді, сыныпты және тақырыпты таңдаңыз. Е-Тарих 45 минуттық ҚМЖ-ны дайындап, жеке кабинетіңізге сақтайды.</p>
+        <div class="hero-actions"><a class="primary" href="#builder">ҚМЖ жасау</a><a class="secondary" href="/account.html">Жеке кабинет</a></div>
         <div class="hero-contacts" id="contact">
           <div><small>Автор және байланыс</small><strong>Мұрат Ернұр Мырзағалиұлы</strong></div>
           <a class="contact-button whatsapp" href="https://wa.me/77055630880" target="_blank" rel="noopener noreferrer"><b>W</b><span><small>WhatsApp</small>8 705 563 08 80</span></a>
           <a class="contact-button telegram" href="https://t.me/+77055630880" target="_blank" rel="noopener noreferrer"><b>➤</b><span><small>Telegram</small>8 705 563 08 80</span></a>
-          <button class="contact-button kaspi" id="copyKaspi" type="button" title="Карта нөмірін көшіру"><b>K</b><span><small>Kaspi · 8 705 563 08 80</small>4400 4303 0414 7348</span></button>
+          <a class="contact-button kaspi" href="https://wa.me/77055630880?text=Kaspi%20реквизитін%20жіберіңізші" target="_blank" rel="noopener noreferrer"><b>K</b><span><small>Kaspi</small>Реквизитті сұрау</span></a>
         </div>
         <div class="checks"><span>✓ Бір кодқа 2 құрылғы</span><span>✓ 1–4 тоқсан</span><span>✓ Word жүктеу</span></div>
       </div>
@@ -88,7 +88,7 @@
           </details>
           <p class="error" id="formError"></p>
           <button class="generate" id="generateButton" type="submit"><span>✦</span> ҚМЖ құрастыру</button>
-          <p class="privacy">Жеке аккаунт ашылмайды. ҚМЖ тек жарамды кіру кодымен құрастырылады.</p>
+          <p class="privacy">Жеке кабинетке кірсеңіз, дайын ҚМЖ автоматты түрде «Менің құжаттарым» бөліміне сақталады.</p>
         </form>
 
         <section class="result-card" id="resultCard">
@@ -108,12 +108,14 @@
   </main>
 
   <footer>
-    <div class="brand"><span>ET</span><strong>Ernur Тарих</strong></div>
-    <p>Мұғалімге арналған ҚМЖ құрастыру сервисі</p>
+    <div class="brand"><span>ЕТ</span><strong>Е-Тарих</strong></div>
+    <p>Мұғалімге арналған білім беру платформасы</p>
     <div class="author"><small>Автор: <strong>Мұрат Ернұр Мырзағалиұлы</strong></small></div>
   </footer>
+  <nav class="mobile-nav" aria-label="Негізгі мәзір"><a class="active" href="#top">Басты бет</a><a href="/tools.html">Құралдар</a><a href="/account.html">Кабинет</a></nav>
   <div class="toast hidden" id="toast"></div>
   <script src="/vendor/jszip.min.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>
+

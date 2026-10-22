@@ -4,6 +4,7 @@ const $ = selector => document.querySelector(selector);
 let current = { html: '', text: '' };
 const ACCESS_STORAGE_KEY = 'ernur-qmj-access-code';
 const DEVICE_STORAGE_KEY = 'ernur-qmj-device-id';
+const TEACHER_TOKEN_KEY = 'e-tarih-teacher-token';
 let accessCode = localStorage.getItem(ACCESS_STORAGE_KEY) || '';
 let deviceId = localStorage.getItem(DEVICE_STORAGE_KEY) || '';
 let allSubjects = [];
@@ -134,6 +135,7 @@ async function generate(event) {
     $('#modelLabel').textContent = data.model === 'demo-template' ? 'Дайын құрылым' : 'ҚМЖ дайын';
     $('#emptyResult').classList.add('hidden');
     $('#resultContent').classList.remove('hidden');
+    saveToTeacherCabinet().catch(error => console.warn('ҚМЖ жеке кабинетке сақталмады:', error.message));
     if (window.innerWidth < 900) $('#resultCard').scrollIntoView({ behavior: 'smooth' });
   } catch (error) {
     $('#formError').textContent = error.message;
@@ -143,6 +145,22 @@ async function generate(event) {
     button.disabled = false;
     button.innerHTML = original;
   }
+}
+
+async function saveToTeacherCabinet() {
+  const teacherToken = localStorage.getItem(TEACHER_TOKEN_KEY);
+  if (!teacherToken || !current.html) return;
+  const response = await fetch('/api/account/documents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Teacher-Token': teacherToken },
+    body: JSON.stringify({ title: current.fields?.topic || 'ҚМЖ', html: current.html, text: current.text, fields: current.fields })
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    if (response.status === 401) localStorage.removeItem(TEACHER_TOKEN_KEY);
+    throw new Error(data.error || 'Сақтау қатесі');
+  }
+  toast('ҚМЖ жеке кабинетке сақталды');
 }
 
 async function copyPlan() {
@@ -421,6 +439,6 @@ $('#changeCodeButton').addEventListener('click', () => lockBuilder());
 $('#copyButton').addEventListener('click', copyPlan);
 $('#printButton').addEventListener('click', () => window.print());
 $('#wordButton').addEventListener('click', downloadWord);
-$('#copyKaspi').addEventListener('click', async () => { await navigator.clipboard.writeText('4400430304147348'); toast('Kaspi карта нөмірі көшірілді'); });
 loadSubjects().catch(() => { $('#formError').textContent = 'Пәндер тізімі жүктелмеді'; });
 restoreAccess();
+
