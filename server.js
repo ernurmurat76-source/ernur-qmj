@@ -1126,8 +1126,11 @@ function serveStatic(res, pathname) {
   });
 }
 
+const handleXpAttendance = require('./xp-attendance')({ dbRequest, authenticatedTeacher, readJson, sendJson, secret: ACCESS_CODE_SECRET });
+
 const server = http.createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname);
+  if (pathname.startsWith('/api/xp/')) return handleXpAttendance(req, res, pathname);
   if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
   return serveStatic(res, pathname);
 });
