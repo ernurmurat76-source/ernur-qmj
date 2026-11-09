@@ -1126,8 +1126,18 @@ function serveStatic(res, pathname) {
   });
 }
 
+const handleXpAttendance = require('./xp-attendance')({ dbRequest, authenticatedTeacher, readJson, sendJson, secret: ACCESS_CODE_SECRET });
+
 const server = http.createServer((req, res) => {
   const pathname = decodeURIComponent(new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname);
+  if (pathname === '/api/xp/qr' && req.method === 'GET') {
+    const challenge = new URL(req.url, 'http://localhost').searchParams.get('challenge') || '';
+    if (!/^[a-f0-9]{64}$/.test(challenge)) return sendJson(res, 400, { error: 'QR коды қате' });
+    return QRCode.toBuffer('https://' + (req.headers.host || 'localhost') + '/9a-student.html#' + challenge, { type: 'png', width: 300 })
+      .then(buffer => { res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); res.end(buffer); })
+      .catch(() => sendJson(res, 500, { error: 'QR жасалмады' }));
+  }
+  if (pathname.startsWith('/api/xp/')) return handleXpAttendance(req, res, pathname);
   if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
   return serveStatic(res, pathname);
 });
